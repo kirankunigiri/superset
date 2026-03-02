@@ -1,5 +1,6 @@
 # Codex exposes completion notifications via notify.
-# For per-prompt Start notifications, watch the TUI session log for task_started.
+# For per-prompt Start notifications and permission requests, watch the TUI
+# session log for task_started and approval_request events.
 if [ -n "$SUPERSET_TAB_ID" ] && [ -f "{{NOTIFY_PATH}}" ]; then
   export CODEX_TUI_RECORD_SESSION=1
   if [ -z "$CODEX_TUI_SESSION_LOG_PATH" ]; then
@@ -11,6 +12,7 @@ if [ -n "$SUPERSET_TAB_ID" ] && [ -f "{{NOTIFY_PATH}}" ]; then
     _superset_log="$CODEX_TUI_SESSION_LOG_PATH"
     _superset_notify="{{NOTIFY_PATH}}"
     _superset_last_turn_id=""
+    _superset_last_approval_id=""
 
     # Wait briefly for codex to create the session log.
     _superset_i=0
@@ -28,6 +30,16 @@ if [ -n "$SUPERSET_TAB_ID" ] && [ -f "{{NOTIFY_PATH}}" ]; then
           if [ "$_superset_turn_id" != "$_superset_last_turn_id" ]; then
             _superset_last_turn_id="$_superset_turn_id"
             bash "$_superset_notify" '{"hook_event_name":"Start"}' >/dev/null 2>&1 || true
+          fi
+          ;;
+        *'"dir":"to_tui"'*'"kind":"codex_event"'*'"approval_request"'*)
+          _superset_approval_id=$(printf '%s\n' "$_superset_line" | awk -F'"id":"' 'NF > 1 { sub(/".*/, "", $2); print $2; exit }')
+          [ -n "$_superset_approval_id" ] || _superset_approval_id=$(printf '%s\n' "$_superset_line" | awk -F'"approval_id":"' 'NF > 1 { sub(/".*/, "", $2); print $2; exit }')
+          [ -n "$_superset_approval_id" ] || _superset_approval_id=$(printf '%s\n' "$_superset_line" | awk -F'"call_id":"' 'NF > 1 { sub(/".*/, "", $2); print $2; exit }')
+          [ -n "$_superset_approval_id" ] || _superset_approval_id="approval_request"
+          if [ "$_superset_approval_id" != "$_superset_last_approval_id" ]; then
+            _superset_last_approval_id="$_superset_approval_id"
+            bash "$_superset_notify" '{"hook_event_name":"PermissionRequest"}' >/dev/null 2>&1 || true
           fi
           ;;
       esac
