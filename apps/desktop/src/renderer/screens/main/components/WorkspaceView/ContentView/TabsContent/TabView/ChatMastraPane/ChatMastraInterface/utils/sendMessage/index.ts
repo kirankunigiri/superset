@@ -1,5 +1,5 @@
 export {
 	type ChatSendMessageInput,
-	sendMessageWithRetry,
+	sendMessageOnce,
 	toSendFailureMessage,
 } from "./sendMessage";

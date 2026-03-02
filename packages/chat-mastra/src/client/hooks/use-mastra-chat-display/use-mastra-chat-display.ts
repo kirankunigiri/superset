@@ -15,9 +15,6 @@ type ListMessagesOutput = SessionOutputs["listMessages"];
 type HistoryMessage = ListMessagesOutput[number];
 type HistoryMessagePart = HistoryMessage["content"][number];
 
-const SEND_RETRY_DELAY_MS = 250;
-const MAX_SEND_ATTEMPTS = 2;
-
 export type MastraChatDisplayState = DisplayStateOutput;
 export type MastraChatHistoryMessages = ListMessagesOutput;
 
@@ -38,55 +35,6 @@ function findLastUserMessageIndex(messages: ListMessagesOutput): number {
 		if (messages[index]?.role === "user") return index;
 	}
 	return -1;
-}
-
-function delay(ms: number): Promise<void> {
-	return new Promise((resolve) => {
-		setTimeout(resolve, ms);
-	});
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-	return typeof value === "object" && value !== null
-		? (value as Record<string, unknown>)
-		: null;
-}
-
-function getErrorStatusCode(error: unknown): number | null {
-	const errorRecord = asRecord(error);
-	const dataRecord = asRecord(errorRecord?.data);
-	const dataHttpStatus = dataRecord?.httpStatus;
-	if (typeof dataHttpStatus === "number") return dataHttpStatus;
-
-	const shapeRecord = asRecord(errorRecord?.shape);
-	const shapeDataRecord = asRecord(shapeRecord?.data);
-	const shapeHttpStatus = shapeDataRecord?.httpStatus;
-	if (typeof shapeHttpStatus === "number") return shapeHttpStatus;
-
-	return null;
-}
-
-function isRetryableSendError(error: unknown): boolean {
-	const statusCode = getErrorStatusCode(error);
-	if (statusCode !== null) {
-		return statusCode === 408 || statusCode === 425 || statusCode === 429
-			? true
-			: statusCode >= 500;
-	}
-
-	const message =
-		error instanceof Error
-			? error.message.toLowerCase()
-			: String(error).toLowerCase();
-
-	return (
-		message.includes("network") ||
-		message.includes("failed to fetch") ||
-		message.includes("timeout") ||
-		message.includes("temporarily unavailable") ||
-		message.includes("connection reset") ||
-		message.includes("socket hang up")
-	);
 }
 
 export function findLatestAssistantErrorMessage(
@@ -241,20 +189,11 @@ export function useMastraChatDisplay(options: UseMastraChatDisplayOptions) {
 				}
 
 				try {
-					for (let attempt = 1; attempt <= MAX_SEND_ATTEMPTS; attempt += 1) {
-						try {
-							return await utils.client.session.sendMessage.mutate({
-								sessionId,
-								...(cwd ? { cwd } : {}),
-								...input,
-							});
-						} catch (error) {
-							const canRetry =
-								attempt < MAX_SEND_ATTEMPTS && isRetryableSendError(error);
-							if (!canRetry) throw error;
-							await delay(SEND_RETRY_DELAY_MS);
-						}
-					}
+					return await utils.client.session.sendMessage.mutate({
+						sessionId,
+						...(cwd ? { cwd } : {}),
+						...input,
+					});
 				} catch (error) {
 					setCommandError(error);
 					setOptimisticUserMessage(null);
