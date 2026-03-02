@@ -234,35 +234,35 @@ export function ChatMastraPane({
 		sessionId && sessions.some((item) => item.id === sessionId),
 	);
 	const [isSessionInitializing, setIsSessionInitializing] = useState(false);
-	const [sessionInitRetryToken, setSessionInitRetryToken] = useState(0);
 	const sessionInitRetryCountRef = useRef(0);
 	const sessionInitRetryTimeoutRef = useRef<ReturnType<
 		typeof setTimeout
 	> | null>(null);
-	const ensureSessionRecordRef = useRef<string | null>(null);
+	const sessionInitInFlightRef = useRef<Promise<boolean> | null>(null);
 	const sessionInitScopeRef = useRef<string | null>(null);
+
+	const clearSessionInitRetryTimeout = useCallback(() => {
+		if (sessionInitRetryTimeoutRef.current) {
+			clearTimeout(sessionInitRetryTimeoutRef.current);
+			sessionInitRetryTimeoutRef.current = null;
+		}
+	}, []);
 
 	useEffect(() => {
 		return () => {
-			if (sessionInitRetryTimeoutRef.current) {
-				clearTimeout(sessionInitRetryTimeoutRef.current);
-				sessionInitRetryTimeoutRef.current = null;
-			}
+			clearSessionInitRetryTimeout();
 		};
-	}, []);
+	}, [clearSessionInitRetryTimeout]);
 
 	useEffect(() => {
 		const scope = `${organizationId ?? "none"}:${workspaceId}:${sessionId ?? "none"}`;
 		if (sessionInitScopeRef.current === scope) return;
 		sessionInitScopeRef.current = scope;
 		sessionInitRetryCountRef.current = 0;
-		ensureSessionRecordRef.current = null;
+		sessionInitInFlightRef.current = null;
 		setIsSessionInitializing(false);
-		if (sessionInitRetryTimeoutRef.current) {
-			clearTimeout(sessionInitRetryTimeoutRef.current);
-			sessionInitRetryTimeoutRef.current = null;
-		}
-	}, [organizationId, sessionId, workspaceId]);
+		clearSessionInitRetryTimeout();
+	}, [clearSessionInitRetryTimeout, organizationId, sessionId, workspaceId]);
 
 	const handleSelectSession = useCallback(
 		(nextSessionId: string) => {
@@ -369,99 +369,105 @@ export function ChatMastraPane({
 		[organizationId, paneId, sessionId, switchChatMastraSession, workspaceId],
 	);
 
+	const runSessionInit = useCallback(
+		async ({
+			retryOnFailure,
+		}: {
+			retryOnFailure: boolean;
+		}): Promise<boolean> => {
+			if (!sessionId || !organizationId) return false;
+			if (hasCurrentSessionRecord) {
+				sessionInitRetryCountRef.current = 0;
+				sessionInitInFlightRef.current = null;
+				clearSessionInitRetryTimeout();
+				setIsSessionInitializing(false);
+				return true;
+			}
+
+			const scopeKey = `${organizationId}:${workspaceId}:${sessionId}`;
+			const existingInFlight = sessionInitInFlightRef.current;
+			if (existingInFlight) return existingInFlight;
+
+			setIsSessionInitializing(true);
+
+			const attemptPromise = createSessionRecord({
+				sessionId,
+				organizationId,
+				workspaceId,
+			})
+				.then(() => {
+					if (sessionInitScopeRef.current !== scopeKey) return false;
+					sessionInitRetryCountRef.current = 0;
+					clearSessionInitRetryTimeout();
+					setIsSessionInitializing(false);
+					return true;
+				})
+				.catch((error) => {
+					reportChatMastraError({
+						operation: "session.create",
+						error,
+						sessionId,
+						workspaceId,
+						paneId,
+						organizationId,
+					});
+					if (sessionInitScopeRef.current !== scopeKey) return false;
+
+					if (retryOnFailure) {
+						const nextRetry = sessionInitRetryCountRef.current + 1;
+						sessionInitRetryCountRef.current = nextRetry;
+						if (nextRetry <= SESSION_INIT_MAX_RETRIES) {
+							clearSessionInitRetryTimeout();
+							sessionInitRetryTimeoutRef.current = setTimeout(() => {
+								sessionInitRetryTimeoutRef.current = null;
+								if (sessionInitScopeRef.current !== scopeKey) return;
+								void runSessionInit({ retryOnFailure: true });
+							}, SESSION_INIT_RETRY_DELAY_MS);
+							return false;
+						}
+						toast.error("Failed to initialize chat session");
+					}
+
+					setIsSessionInitializing(false);
+					return false;
+				})
+				.finally(() => {
+					if (sessionInitScopeRef.current !== scopeKey) return;
+					if (sessionInitInFlightRef.current !== attemptPromise) return;
+					sessionInitInFlightRef.current = null;
+				});
+
+			sessionInitInFlightRef.current = attemptPromise;
+			return attemptPromise;
+		},
+		[
+			clearSessionInitRetryTimeout,
+			hasCurrentSessionRecord,
+			organizationId,
+			paneId,
+			sessionId,
+			workspaceId,
+		],
+	);
+
 	const ensureCurrentSessionRecord = useCallback(async (): Promise<boolean> => {
 		if (!sessionId || !organizationId) return false;
-		if (hasCurrentSessionRecord) return true;
+		return runSessionInit({ retryOnFailure: false });
+	}, [organizationId, runSessionInit, sessionId]);
 
-		const ensureKey = `${organizationId}:${workspaceId}:${sessionId}:manual`;
-		ensureSessionRecordRef.current = ensureKey;
-		setIsSessionInitializing(true);
-
-		try {
-			await createSessionRecord({
-				sessionId,
-				organizationId,
-				workspaceId,
-			});
-			if (ensureSessionRecordRef.current !== ensureKey) return false;
-			sessionInitRetryCountRef.current = 0;
-			setIsSessionInitializing(false);
-			return true;
-		} catch (error) {
-			if (ensureSessionRecordRef.current !== ensureKey) return false;
-			reportChatMastraError({
-				operation: "session.create",
-				error,
-				sessionId,
-				workspaceId,
-				paneId,
-				organizationId,
-			});
-			ensureSessionRecordRef.current = null;
-			setIsSessionInitializing(false);
-			return false;
-		}
-	}, [hasCurrentSessionRecord, organizationId, paneId, sessionId, workspaceId]);
+	useEffect(() => {
+		if (!hasCurrentSessionRecord) return;
+		sessionInitRetryCountRef.current = 0;
+		sessionInitInFlightRef.current = null;
+		clearSessionInitRetryTimeout();
+		setIsSessionInitializing(false);
+	}, [clearSessionInitRetryTimeout, hasCurrentSessionRecord]);
 
 	useEffect(() => {
 		if (!sessionId || !organizationId) return;
-		if (hasCurrentSessionRecord) {
-			sessionInitRetryCountRef.current = 0;
-			if (sessionInitRetryTimeoutRef.current) {
-				clearTimeout(sessionInitRetryTimeoutRef.current);
-				sessionInitRetryTimeoutRef.current = null;
-			}
-			ensureSessionRecordRef.current = null;
-			setIsSessionInitializing(false);
-			return;
-		}
-
-		const ensureKey = `${organizationId}:${workspaceId}:${sessionId}:${sessionInitRetryToken}`;
-		if (ensureSessionRecordRef.current === ensureKey) return;
-		ensureSessionRecordRef.current = ensureKey;
-		setIsSessionInitializing(true);
-
-		void createSessionRecord({
-			sessionId,
-			organizationId,
-			workspaceId,
-		})
-			.then(() => {
-				if (ensureSessionRecordRef.current !== ensureKey) return;
-				sessionInitRetryCountRef.current = 0;
-				setIsSessionInitializing(false);
-			})
-			.catch((error) => {
-				if (ensureSessionRecordRef.current !== ensureKey) return;
-				reportChatMastraError({
-					operation: "session.create",
-					error,
-					sessionId,
-					workspaceId,
-					paneId,
-					organizationId,
-				});
-				ensureSessionRecordRef.current = null;
-				const nextRetry = sessionInitRetryCountRef.current + 1;
-				sessionInitRetryCountRef.current = nextRetry;
-				if (nextRetry <= SESSION_INIT_MAX_RETRIES) {
-					sessionInitRetryTimeoutRef.current = setTimeout(() => {
-						sessionInitRetryTimeoutRef.current = null;
-						setSessionInitRetryToken((token) => token + 1);
-					}, SESSION_INIT_RETRY_DELAY_MS);
-					return;
-				}
-				setIsSessionInitializing(false);
-				toast.error("Failed to initialize chat session");
-			});
-	}, [
-		hasCurrentSessionRecord,
-		organizationId,
-		paneId,
-		sessionId,
-		sessionInitRetryToken,
-		workspaceId,
-	]);
+		if (hasCurrentSessionRecord) return;
+		void runSessionInit({ retryOnFailure: true });
+	}, [hasCurrentSessionRecord, organizationId, runSessionInit, sessionId]);
 
 	useEffect(() => {
 		// Legacy fallback for panes created before session IDs were seeded at pane creation.
