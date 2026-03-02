@@ -258,12 +258,16 @@ export function ChatMastraInterface({
 			const isSlashCommand = text.startsWith("/");
 			const slashCommandResult = await resolveSlashCommandInput(text);
 			if (slashCommandResult.handled) {
+				setSubmitStatus(undefined);
 				return;
 			}
 			text = slashCommandResult.nextText.trim();
 
 			const images = toMastraImages(files);
-			if (!text && images.length === 0) return;
+			if (!text && images.length === 0) {
+				setSubmitStatus(undefined);
+				return;
+			}
 			setSubmitStatus("submitted");
 			clearRuntimeError();
 
@@ -291,6 +295,7 @@ export function ChatMastraInterface({
 				targetSessionId = sendResult.targetSessionId;
 			} catch (error) {
 				const sendErrorMessage = toSendFailureMessage(error);
+				setSubmitStatus(undefined);
 				setRuntimeErrorMessage(sendErrorMessage);
 				if (error instanceof Error) throw error;
 				throw new Error(sendErrorMessage);
@@ -359,6 +364,8 @@ export function ChatMastraInterface({
 	);
 
 	const errorMessage = runtimeError ?? toErrorMessage(error);
+	const isAwaitingAssistant =
+		isRunning || submitStatus === "submitted" || submitStatus === "streaming";
 
 	return (
 		<PromptInputProvider>
@@ -366,6 +373,7 @@ export function ChatMastraInterface({
 				<ChatMastraMessageList
 					messages={messages}
 					isRunning={canAbort}
+					isAwaitingAssistant={isAwaitingAssistant}
 					currentMessage={currentMessage ?? null}
 					workspaceId={workspaceId}
 					sessionId={sessionId}
@@ -392,9 +400,6 @@ export function ChatMastraInterface({
 					slashCommands={slashCommands}
 					onSend={handleSend}
 					onSubmitStart={() => setSubmitStatus("submitted")}
-					onSubmitEnd={() => {
-						if (!canAbort) setSubmitStatus(undefined);
-					}}
 					onStop={handleStop}
 					onSlashCommandSend={handleSlashCommandSend}
 				/>

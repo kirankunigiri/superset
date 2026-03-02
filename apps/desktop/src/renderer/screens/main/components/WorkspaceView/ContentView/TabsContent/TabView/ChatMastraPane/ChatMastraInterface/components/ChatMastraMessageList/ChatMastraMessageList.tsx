@@ -40,6 +40,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 interface ChatMastraMessageListProps {
 	messages: MastraMessage[];
 	isRunning: boolean;
+	isAwaitingAssistant: boolean;
 	currentMessage: MastraMessage | null;
 	workspaceId: string;
 	sessionId: string | null;
@@ -136,6 +137,7 @@ function getStreamingPreviewToolParts({
 export function ChatMastraMessageList({
 	messages,
 	isRunning,
+	isAwaitingAssistant,
 	currentMessage,
 	workspaceId,
 	sessionId,
@@ -164,6 +166,10 @@ export function ChatMastraMessageList({
 			}),
 		[activeTools, toolInputBuffers],
 	);
+	const shouldShowThinking =
+		isAwaitingAssistant && !currentMessage && previewToolParts.length === 0;
+	const shouldShowToolPreview =
+		isAwaitingAssistant && !currentMessage && previewToolParts.length > 0;
 
 	return (
 		<Conversation className="flex-1">
@@ -212,37 +218,31 @@ export function ChatMastraMessageList({
 						previewToolParts={previewToolParts}
 					/>
 				)}
-				{isRunning &&
-					!currentMessage &&
-					visibleMessages[visibleMessages.length - 1]?.role === "user" &&
-					previewToolParts.length === 0 && (
-						<Message from="assistant">
-							<MessageContent>
-								<ShimmerLabel className="text-sm text-muted-foreground">
-									Thinking...
-								</ShimmerLabel>
-							</MessageContent>
-						</Message>
-					)}
-				{isRunning &&
-					!currentMessage &&
-					visibleMessages[visibleMessages.length - 1]?.role === "user" &&
-					previewToolParts.length > 0 && (
-						<Message from="assistant">
-							<MessageContent>
-								{previewToolParts.map((part) => (
-									<MastraToolCallBlock
-										key={`tool-preview-${part.toolCallId}`}
-										part={part}
-										workspaceId={workspaceId}
-										sessionId={sessionId}
-										organizationId={organizationId}
-										workspaceCwd={workspaceCwd}
-									/>
-								))}
-							</MessageContent>
-						</Message>
-					)}
+				{shouldShowThinking && (
+					<Message from="assistant">
+						<MessageContent>
+							<ShimmerLabel className="text-sm text-muted-foreground">
+								Thinking...
+							</ShimmerLabel>
+						</MessageContent>
+					</Message>
+				)}
+				{shouldShowToolPreview && (
+					<Message from="assistant">
+						<MessageContent>
+							{previewToolParts.map((part) => (
+								<MastraToolCallBlock
+									key={`tool-preview-${part.toolCallId}`}
+									part={part}
+									workspaceId={workspaceId}
+									sessionId={sessionId}
+									organizationId={organizationId}
+									workspaceCwd={workspaceCwd}
+								/>
+							))}
+						</MessageContent>
+					</Message>
+				)}
 			</ConversationContent>
 			<MessageScrollbackRail messages={visibleMessages} />
 			<ConversationScrollButton />
