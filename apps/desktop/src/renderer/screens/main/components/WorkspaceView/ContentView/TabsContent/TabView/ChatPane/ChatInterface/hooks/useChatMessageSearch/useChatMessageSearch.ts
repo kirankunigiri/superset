@@ -3,14 +3,12 @@ import { useEffect } from "react";
 import { useAppHotkey } from "renderer/stores/hotkeys";
 import { useTextSearch } from "../../../../hooks/useTextSearch";
 
-interface UseMarkdownSearchOptions {
+interface UseChatMessageSearchOptions {
 	containerRef: RefObject<HTMLDivElement | null>;
 	isFocused: boolean;
-	isRenderedMode: boolean;
-	filePath: string;
 }
 
-interface UseMarkdownSearchReturn {
+interface UseChatMessageSearchReturn {
 	isSearchOpen: boolean;
 	query: string;
 	caseSensitive: boolean;
@@ -23,39 +21,27 @@ interface UseMarkdownSearchReturn {
 	closeSearch: () => void;
 }
 
-export function useMarkdownSearch({
+export function useChatMessageSearch({
 	containerRef,
 	isFocused,
-	isRenderedMode,
-	filePath,
-}: UseMarkdownSearchOptions): UseMarkdownSearchReturn {
+}: UseChatMessageSearchOptions): UseChatMessageSearchReturn {
 	const search = useTextSearch({
 		containerRef,
 		highlightKeys: {
-			matches: "markdown-search-matches",
-			active: "markdown-search-active",
+			matches: "chat-search-matches",
+			active: "chat-search-active",
 		},
 	});
 
-	// Close search when pane loses focus or exits rendered mode
+	// Close search when the chat pane loses focus
 	useEffect(() => {
-		if (!isFocused || !isRenderedMode) {
-			if (search.isSearchOpen) {
-				search.closeSearch();
-			}
-		}
-	}, [isFocused, isRenderedMode, search.isSearchOpen, search.closeSearch]);
-
-	// Reset search when file changes so stale Range objects don't linger
-	// biome-ignore lint/correctness/useExhaustiveDependencies: Reset on file change only
-	useEffect(() => {
-		if (search.isSearchOpen) {
+		if (!isFocused && search.isSearchOpen) {
 			search.closeSearch();
 		}
-	}, [filePath]);
+	}, [isFocused, search.isSearchOpen, search.closeSearch]);
 
 	useAppHotkey(
-		"FIND_IN_FILE_VIEWER",
+		"FIND_IN_CHAT",
 		() => {
 			if (search.isSearchOpen) {
 				search.closeSearch();
@@ -63,14 +49,8 @@ export function useMarkdownSearch({
 				search.openSearch();
 			}
 		},
-		{ enabled: isFocused && isRenderedMode, preventDefault: true },
-		[
-			isFocused,
-			isRenderedMode,
-			search.isSearchOpen,
-			search.openSearch,
-			search.closeSearch,
-		],
+		{ enabled: isFocused, preventDefault: true },
+		[isFocused, search.isSearchOpen, search.openSearch, search.closeSearch],
 	);
 
 	return {

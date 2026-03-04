@@ -514,6 +514,12 @@ export const HOTKEYS = {
 		category: "Terminal",
 		description: "Search text in the rendered file viewer",
 	}),
+	FIND_IN_CHAT: defineHotkey({
+		keys: "meta+f",
+		label: "Find in Chat",
+		category: "Terminal",
+		description: "Search text in the chat message history",
+	}),
 	NEW_GROUP: defineHotkey({
 		keys: "meta+t",
 		label: "New Terminal",
