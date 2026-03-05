@@ -1,8 +1,10 @@
+import { toast } from "@superset/ui/sonner";
 import { Spinner } from "@superset/ui/spinner";
 import { useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HiCheckCircle } from "react-icons/hi2";
+import { useOpenProject } from "renderer/react-query/projects";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import {
 	useOpenStartWorkingModal,
@@ -120,9 +122,28 @@ export function TasksView({
 		prevModalOpen.current = isModalOpen;
 	}, [isModalOpen, setRowSelection]);
 
-	const handleStartWorking = () => {
+	const { openNew } = useOpenProject();
+
+	const handleStartWorking = (projectId?: string) => {
 		if (selectedTasks.length === 0) return;
-		openStartWorkingModal(selectedTasks);
+		openStartWorkingModal({ tasks: selectedTasks, projectId });
+	};
+
+	const handleImportRepo = async () => {
+		try {
+			const projects = await openNew();
+			if (projects.length > 0 && selectedTasks.length > 0) {
+				openStartWorkingModal({
+					tasks: selectedTasks,
+					projectId: projects[0].id,
+				});
+			}
+		} catch (error) {
+			toast.error("Failed to open project", {
+				description:
+					error instanceof Error ? error.message : "An unknown error occurred",
+			});
+		}
 	};
 
 	const handleTabChange = (tab: TabValue) => {
@@ -184,6 +205,7 @@ export function TasksView({
 					onAssigneeFilterChange={handleAssigneeFilterChange}
 					selectedCount={selectedTasks.length}
 					onStartWorking={handleStartWorking}
+					onImportRepo={handleImportRepo}
 					onClearSelection={handleClearSelection}
 				/>
 			)}

@@ -1,9 +1,22 @@
 import { Button } from "@superset/ui/button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@superset/ui/dropdown-menu";
 import { Input } from "@superset/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@superset/ui/tabs";
 import { useRef } from "react";
-import { HiOutlineMagnifyingGlass, HiXMark } from "react-icons/hi2";
-import { LuPlay } from "react-icons/lu";
+import {
+	HiChevronDown,
+	HiOutlineMagnifyingGlass,
+	HiXMark,
+} from "react-icons/hi2";
+import { LuFolderOpen, LuPlay } from "react-icons/lu";
+import { electronTrpc } from "renderer/lib/electron-trpc";
+import { ProjectThumbnail } from "renderer/screens/main/components/WorkspaceSidebar/ProjectSection/ProjectThumbnail";
 import { useAppHotkey } from "renderer/stores/hotkeys";
 import { ActiveIcon } from "../shared/icons/ActiveIcon";
 import { AllIssuesIcon } from "../shared/icons/AllIssuesIcon";
@@ -20,7 +33,8 @@ interface TasksTopBarProps {
 	assigneeFilter: string | null;
 	onAssigneeFilterChange: (value: string | null) => void;
 	selectedCount?: number;
-	onStartWorking?: () => void;
+	onStartWorking?: (projectId?: string) => void;
+	onImportRepo?: () => void;
 	onClearSelection?: () => void;
 }
 
@@ -51,6 +65,7 @@ export function TasksTopBar({
 	onAssigneeFilterChange,
 	selectedCount = 0,
 	onStartWorking,
+	onImportRepo,
 	onClearSelection,
 }: TasksTopBarProps) {
 	const searchInputRef = useRef<HTMLInputElement>(null);
@@ -63,6 +78,9 @@ export function TasksTopBar({
 		},
 		{ preventDefault: true },
 	);
+
+	const { data: recentProjects = [] } =
+		electronTrpc.projects.getRecents.useQuery();
 
 	const hasSelection = selectedCount > 0;
 
@@ -84,10 +102,61 @@ export function TasksTopBar({
 							{selectedCount} selected
 						</span>
 						<div className="h-4 w-px bg-border" />
-						<Button variant="default" size="xs" onClick={onStartWorking}>
-							<LuPlay />
-							Run with Agent
-						</Button>
+						<div className="flex items-center">
+							<Button
+								variant="default"
+								size="xs"
+								className="rounded-r-none"
+								onClick={() => onStartWorking?.()}
+							>
+								<LuPlay />
+								Run with Agent
+							</Button>
+							<DropdownMenu>
+								<DropdownMenuTrigger asChild>
+									<Button
+										variant="default"
+										size="xs"
+										className="rounded-l-none border-l border-primary-foreground/20 px-1.5"
+									>
+										<HiChevronDown className="size-3.5" />
+									</Button>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent align="start">
+									{recentProjects.length === 0 ? (
+										<DropdownMenuItem disabled>
+											No projects found
+										</DropdownMenuItem>
+									) : (
+										recentProjects
+											.filter((project) => project.id)
+											.map((project) => (
+												<DropdownMenuItem
+													key={project.id}
+													onClick={() => onStartWorking?.(project.id)}
+													className="flex items-center gap-2"
+												>
+													<ProjectThumbnail
+														projectId={project.id}
+														projectName={project.name}
+														projectColor={project.color}
+														githubOwner={project.githubOwner}
+														hideImage={project.hideImage ?? undefined}
+														iconUrl={project.iconUrl}
+														className="size-4"
+													/>
+													{project.name}
+												</DropdownMenuItem>
+											))
+									)}
+									<DropdownMenuSeparator />
+									<DropdownMenuItem onClick={onImportRepo}>
+										<LuFolderOpen />
+										Import repo
+									</DropdownMenuItem>
+								</DropdownMenuContent>
+							</DropdownMenu>
+						</div>
 					</>
 				) : (
 					<>
