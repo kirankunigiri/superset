@@ -175,14 +175,21 @@ describe("tryRepairWorktreePath", () => {
 		const mainRepo = createTestRepo("main-reject");
 		seedCommit(mainRepo);
 
-		// The main repo's branch (e.g. "main") is checked out in the main worktree.
-		// Simulate a stale worktree that had branch "main".
+		// Derive the actual default branch so the test exercises the guard
+		// regardless of whether `git init` defaults to "main" or "master".
+		const defaultBranch = execSync(
+			`git -C "${mainRepo}" rev-parse --abbrev-ref HEAD`,
+			{
+				encoding: "utf-8",
+			},
+		).trim();
+
 		const stalePath = join(TEST_DIR, "wt-gone");
 
 		mockWorktrees.set("wt-3", {
 			id: "wt-3",
 			path: stalePath,
-			branch: "main",
+			branch: defaultBranch,
 			projectId: "proj-3",
 		});
 		mockProjects.set("proj-3", { id: "proj-3", mainRepoPath: mainRepo });
