@@ -3,6 +3,9 @@ import {
 	ContextMenuContent,
 	ContextMenuItem,
 	ContextMenuSeparator,
+	ContextMenuSub,
+	ContextMenuSubContent,
+	ContextMenuSubTrigger,
 	ContextMenuTrigger,
 } from "@superset/ui/context-menu";
 import {
@@ -19,6 +22,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useDrag, useDrop } from "react-dnd";
 import { HiMiniXMark } from "react-icons/hi2";
 import {
+	LuArrowRightLeft,
 	LuBellOff,
 	LuCopy,
 	LuEye,
@@ -28,17 +32,21 @@ import {
 } from "react-icons/lu";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import {
+	useMoveWorkspaceToSection,
 	useReorderWorkspaces,
+	useReorderWorkspacesInSection,
 	useWorkspaceDeleteHandler,
 } from "renderer/react-query/workspaces";
 import { navigateToWorkspace } from "renderer/routes/_authenticated/_dashboard/utils/workspace-navigation";
 import { useBranchSyncInvalidation } from "renderer/screens/main/hooks/useBranchSyncInvalidation";
 import { useGitChangesStatus } from "renderer/screens/main/hooks/useGitChangesStatus";
 import { useWorkspaceRename } from "renderer/screens/main/hooks/useWorkspaceRename";
+import { useActiveDragItemStore } from "renderer/stores/active-drag-item";
 import { useTabsStore } from "renderer/stores/tabs/store";
 import { extractPaneIdsFromLayout } from "renderer/stores/tabs/utils";
 import { getHighestPriorityStatus } from "shared/tabs-types";
 import { STROKE_WIDTH } from "../constants";
+import type { DragItem } from "../types";
 import { CollapsedWorkspaceItem } from "./CollapsedWorkspaceItem";
 import { DeleteWorkspaceDialog, WorkspaceHoverCardContent } from "./components";
 import {
@@ -52,14 +60,7 @@ import { WorkspaceDiffStats } from "./WorkspaceDiffStats";
 import { WorkspaceIcon } from "./WorkspaceIcon";
 import { WorkspaceStatusBadge } from "./WorkspaceStatusBadge";
 
-const WORKSPACE_DND_TYPE = "WORKSPACE";
-
-interface DragItem {
-	id: string;
-	projectId: string;
-	index: number;
-	originalIndex: number;
-}
+export const WORKSPACE_DND_TYPE = "WORKSPACE";
 
 interface WorkspaceListItemProps {
 	id: string;
@@ -72,6 +73,8 @@ interface WorkspaceListItemProps {
 	index: number;
 	shortcutIndex?: number;
 	isCollapsed?: boolean;
+	sectionId?: string | null;
+	sections?: { id: string; name: string }[];
 }
 
 export function WorkspaceListItem({
@@ -85,11 +88,14 @@ export function WorkspaceListItem({
 	index,
 	shortcutIndex,
 	isCollapsed = false,
+	sectionId = null,
+	sections = [],
 }: WorkspaceListItemProps) {
 	const isBranchWorkspace = type === "branch";
 	const navigate = useNavigate();
 	const matchRoute = useMatchRoute();
 	const reorderWorkspaces = useReorderWorkspaces();
+	const reorderWorkspacesInSection = useReorderWorkspacesInSection();
 	const [hasHovered, setHasHovered] = useState(false);
 	const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
 	const rename = useWorkspaceRename(id, name, branch);
@@ -122,6 +128,8 @@ export function WorkspaceListItem({
 		onError: (error) =>
 			toast.error(`Failed to update unread status: ${error.message}`),
 	});
+
+	const moveToSection = useMoveWorkspaceToSection();
 
 	const { showDeleteDialog, setShowDeleteDialog, handleDeleteClick } =
 		useWorkspaceDeleteHandler();
@@ -214,50 +222,97 @@ export function WorkspaceListItem({
 
 	const handleReorder = (item: DragItem) => {
 		if (item.originalIndex === item.index) return;
-		reorderWorkspaces.mutate(
-			{
-				projectId: item.projectId,
-				fromIndex: item.originalIndex,
-				toIndex: item.index,
-			},
-			{
-				onError: (error) =>
-					toast.error(`Failed to reorder workspace: ${error.message}`),
-				onSettled: () => utils.workspaces.getAllGrouped.invalidate(),
-			},
-		);
+		const callbacks = {
+			onError: (error: { message: string }) =>
+				toast.error(`Failed to reorder workspace: ${error.message}`),
+		};
+		if (item.sectionId !== null) {
+			reorderWorkspacesInSection.mutate(
+				{
+					sectionId: item.sectionId,
+					fromIndex: item.originalIndex,
+					toIndex: item.index,
+				},
+				callbacks,
+			);
+		} else {
+			reorderWorkspaces.mutate(
+				{
+					projectId: item.projectId,
+					fromIndex: item.originalIndex,
+					toIndex: item.index,
+				},
+				callbacks,
+			);
+		}
 	};
 
 	const [{ isDragging }, drag] = useDrag(
 		() => ({
 			type: WORKSPACE_DND_TYPE,
-			item: { id, projectId, index, originalIndex: index },
-			end: (item, monitor) => {
-				if (item && !monitor.didDrop()) handleReorder(item);
+			item: () => {
+				const dragItem: DragItem = {
+					id,
+					projectId,
+					sectionId,
+					index,
+					originalIndex: index,
+				};
+				useActiveDragItemStore.getState().setActiveDragItem(dragItem);
+				return dragItem;
+			},
+			end: (item) => {
+				useActiveDragItemStore.getState().clearActiveDragItem();
+				if (!item) return;
+				if (item.handled) return;
+				handleReorder(item);
 			},
 			collect: (monitor) => ({ isDragging: monitor.isDragging() }),
 		}),
-		[id, projectId, index, reorderWorkspaces],
+		[
+			id,
+			projectId,
+			sectionId,
+			index,
+			reorderWorkspaces,
+			reorderWorkspacesInSection,
+		],
 	);
 
 	const [, drop] = useDrop({
 		accept: WORKSPACE_DND_TYPE,
 		hover: (item: DragItem) => {
-			if (item.projectId !== projectId || item.index === index) return;
+			if (
+				item.projectId !== projectId ||
+				item.sectionId !== sectionId ||
+				item.index === index
+			)
+				return;
 			utils.workspaces.getAllGrouped.setData(undefined, (oldData) => {
 				if (!oldData) return oldData;
 				return oldData.map((group) => {
 					if (group.project.id !== projectId) return group;
-					const workspaces = [...group.workspaces];
-					const [moved] = workspaces.splice(item.index, 1);
-					workspaces.splice(index, 0, moved);
-					return { ...group, workspaces };
+					if (sectionId === null) {
+						const workspaces = [...group.workspaces];
+						const [moved] = workspaces.splice(item.index, 1);
+						workspaces.splice(index, 0, moved);
+						return { ...group, workspaces };
+					}
+					const sections = group.sections.map((section) => {
+						if (section.id !== sectionId) return section;
+						const workspaces = [...section.workspaces];
+						const [moved] = workspaces.splice(item.index, 1);
+						workspaces.splice(index, 0, moved);
+						return { ...section, workspaces };
+					});
+					return { ...group, sections };
 				});
 			});
 			item.index = index;
 		},
 		drop: (item: DragItem) => {
-			if (item.projectId === projectId) {
+			if (item.projectId !== projectId) return;
+			if (item.sectionId === sectionId) {
 				handleReorder(item);
 				if (item.originalIndex !== item.index) return { reordered: true };
 			}
@@ -495,6 +550,46 @@ export function WorkspaceListItem({
 				<LuCopy className="size-4 mr-2" strokeWidth={STROKE_WIDTH} />
 				Copy Path
 			</ContextMenuItem>
+			{sections.length > 0 && (
+				<>
+					<ContextMenuSeparator />
+					<ContextMenuSub>
+						<ContextMenuSubTrigger>
+							<LuArrowRightLeft
+								className="size-4 mr-2"
+								strokeWidth={STROKE_WIDTH}
+							/>
+							Move to Section
+						</ContextMenuSubTrigger>
+						<ContextMenuSubContent>
+							<ContextMenuItem
+								onSelect={() =>
+									moveToSection.mutate({
+										workspaceId: id,
+										sectionId: null,
+									})
+								}
+							>
+								No Section
+							</ContextMenuItem>
+							<ContextMenuSeparator />
+							{sections.map((section) => (
+								<ContextMenuItem
+									key={section.id}
+									onSelect={() =>
+										moveToSection.mutate({
+											workspaceId: id,
+											sectionId: section.id,
+										})
+									}
+								>
+									{section.name}
+								</ContextMenuItem>
+							))}
+						</ContextMenuSubContent>
+					</ContextMenuSub>
+				</>
+			)}
 			<ContextMenuSeparator />
 			{unreadMenuItem}
 			{workspaceStatus && (

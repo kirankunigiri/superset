@@ -20,13 +20,18 @@ export function WorkspaceSidebar({
 }: WorkspaceSidebarProps) {
 	const { groups } = useWorkspaceShortcuts();
 
-	// Calculate shortcut base indices for each project group using cumulative offsets
 	const projectShortcutIndices = useMemo(
 		() =>
 			groups.reduce<{ indices: number[]; cumulative: number }>(
 				(acc, group) => ({
 					indices: [...acc.indices, acc.cumulative],
-					cumulative: acc.cumulative + group.workspaces.length,
+					cumulative:
+						acc.cumulative +
+						group.workspaces.length +
+						(group.sections ?? []).reduce(
+							(sum, s) => sum + s.workspaces.length,
+							0,
+						),
 				}),
 				{ indices: [], cumulative: 0 },
 			).indices,
@@ -49,6 +54,7 @@ export function WorkspaceSidebar({
 						hideImage={group.project.hideImage}
 						iconUrl={group.project.iconUrl}
 						workspaces={group.workspaces}
+						sections={group.sections ?? []}
 						shortcutBaseIndex={projectShortcutIndices[index]}
 						index={index}
 						isCollapsed={isCollapsed}
