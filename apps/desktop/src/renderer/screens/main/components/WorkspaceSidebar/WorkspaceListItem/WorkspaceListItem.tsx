@@ -388,6 +388,20 @@ export function WorkspaceListItem({
 			if (item.sectionId === sectionId) {
 				handleReorder(item);
 				if (item.originalIndex !== item.index) return { reordered: true };
+			} else if (!item.handled) {
+				if (item.selectedIds && item.selectedIds.length > 1) {
+					bulkMoveToSection.mutate({
+						workspaceIds: item.selectedIds,
+						sectionId,
+					});
+				} else {
+					moveToSection.mutate({
+						workspaceId: item.id,
+						sectionId,
+					});
+				}
+				item.handled = true;
+				return { moved: true };
 			}
 		},
 	});
