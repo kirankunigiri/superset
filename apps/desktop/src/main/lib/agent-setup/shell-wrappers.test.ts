@@ -89,7 +89,10 @@ describe("shell-wrappers", () => {
 		);
 
 		// precmd hook should be registered to survive PATH resets by tools like mise/asdf
-		expect(zshrc).toContain("precmd_functions+=(_superset_ensure_path)");
+		expect(zshrc).toContain("typeset -ga precmd_functions 2>/dev/null || true");
+		expect(zshrc).toContain(
+			`precmd_functions=(\${precmd_functions:#_superset_ensure_path} _superset_ensure_path)`,
+		);
 		expect(zshrc).toContain("_superset_ensure_path()");
 
 		expect(zlogin).toContain("if [[ -o interactive ]]; then");
@@ -99,6 +102,12 @@ describe("shell-wrappers", () => {
 			zlogin.indexOf('source "$_superset_home/.zlogin"'),
 		);
 		expect(zlogin).toContain("_superset_prepend_bin()");
+		expect(zlogin).toContain(
+			"typeset -ga precmd_functions 2>/dev/null || true",
+		);
+		expect(zlogin).toContain(
+			`precmd_functions=(\${precmd_functions:#_superset_ensure_path} _superset_ensure_path)`,
+		);
 		expect(zlogin).not.toContain(`claude() { "${TEST_BIN_DIR}/claude" "$@"; }`);
 		expect(zlogin).toContain("rehash 2>/dev/null || true");
 	});
@@ -384,7 +393,7 @@ echo wrapper
 		expect(getShellArgs("powershell")).toEqual([]);
 	});
 
-	it("zsh BIN_DIR survives a mise-style precmd that resets PATH", () => {
+	it("zsh BIN_DIR survives a late precmd PATH reset from user .zlogin", () => {
 		if (!isZshAvailable()) return;
 
 		const integrationRoot = path.join(TEST_ROOT, "mise-precmd-repro");
@@ -412,10 +421,10 @@ echo wrapper
 		);
 		chmodSync(path.join(integrationBinDir, "claude"), 0o755);
 
-		// Simulate `mise activate zsh`: user .zshrc registers a precmd that resets
-		// PATH to system-only dirs, evicting superset's bin dir.
+		// Simulate `mise activate zsh` from user .zlogin. In interactive login
+		// shells, .zlogin runs after .zshrc and can register late precmd hooks.
 		writeFileSync(
-			path.join(homeDir, ".zshrc"),
+			path.join(homeDir, ".zlogin"),
 			`_mise_hook_precmd() {
   export PATH="${systemBinDir}:/usr/bin:/bin"
 }
@@ -429,15 +438,13 @@ precmd_functions+=(_mise_hook_precmd)
 			BASH_DIR: integrationBashDir,
 		});
 
-		// Source the superset .zshrc wrapper (non-interactive to avoid auto-sourcing
-		// from ZDOTDIR), then manually invoke all precmd functions in order
-		// (simulating what zsh does before each prompt), then check which claude
-		// binary is found.
+		// Start a real interactive login shell so startup order includes .zlogin.
+		// Then run precmd hooks (simulating prompt rendering) and verify wrapper wins.
 		const output = execFileSync(
 			"zsh",
 			[
-				"-c",
-				`source "${path.join(integrationZshDir, ".zshrc")}"; for fn in $precmd_functions; do "$fn" 2>/dev/null; done; type claude | head -1`,
+				"-lic",
+				'for fn in $precmd_functions; do "$fn" 2>/dev/null; done; type claude | head -1',
 			],
 			{
 				encoding: "utf-8",
@@ -456,6 +463,48 @@ precmd_functions+=(_mise_hook_precmd)
 			.filter(Boolean);
 		const typeLine = lines[lines.length - 1] ?? "";
 		expect(typeLine).toContain(integrationBinDir);
+	});
+
+	it("zsh startup remains healthy when precmd_functions is readonly", () => {
+		if (!isZshAvailable()) return;
+
+		const integrationRoot = path.join(TEST_ROOT, "readonly-precmd-functions");
+		const integrationBinDir = path.join(integrationRoot, "superset-bin");
+		const integrationZshDir = path.join(integrationRoot, "zsh");
+		const integrationBashDir = path.join(integrationRoot, "bash");
+		const homeDir = path.join(integrationRoot, "home");
+
+		mkdirSync(integrationBinDir, { recursive: true });
+		mkdirSync(integrationZshDir, { recursive: true });
+		mkdirSync(integrationBashDir, { recursive: true });
+		mkdirSync(homeDir, { recursive: true });
+
+		// A strict user config that could otherwise cause hook-registration
+		// failures to terminate shell startup.
+		writeFileSync(
+			path.join(homeDir, ".zshrc"),
+			`set -e
+typeset -gr -a precmd_functions
+`,
+		);
+
+		createZshWrapper({
+			BIN_DIR: integrationBinDir,
+			ZSH_DIR: integrationZshDir,
+			BASH_DIR: integrationBashDir,
+		});
+
+		const output = execFileSync("zsh", ["-lic", "echo STARTUP_OK"], {
+			encoding: "utf-8",
+			env: {
+				HOME: homeDir,
+				PATH: "/usr/bin:/bin",
+				SUPERSET_ORIG_ZDOTDIR: homeDir,
+				ZDOTDIR: integrationZshDir,
+			},
+		}).trim();
+
+		expect(output).toBe("STARTUP_OK");
 	});
 
 	describe("fish shell", () => {

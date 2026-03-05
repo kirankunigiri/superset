@@ -106,18 +106,21 @@ _superset_prepend_bin`;
 /**
  * Build a zsh precmd hook that re-asserts BIN_DIR in PATH.
  * Tools like mise/asdf register precmd hooks that reconstruct PATH,
- * which can remove our BIN_DIR. By also using a precmd hook, we ensure
- * BIN_DIR survives dynamic PATH modifications.
+ * which can remove our BIN_DIR. This is intentionally best-effort so
+ * unusual user zsh configs don't break shell startup.
  */
 function buildZshPrecmdHook(binDir: string): string {
-	return `typeset -ga precmd_functions
+	return `typeset -ga precmd_functions 2>/dev/null || true
 _superset_ensure_path() {
   case ":$PATH:" in
     *:"${binDir}":*) ;;
     *) PATH="${binDir}:$PATH" ;;
   esac
 }
-[[ \${precmd_functions[(I)_superset_ensure_path]} -eq 0 ]] && precmd_functions+=(_superset_ensure_path)`;
+{
+  # Keep our hook last so it wins over other PATH-mutating precmd hooks.
+  precmd_functions=(\${precmd_functions:#_superset_ensure_path} _superset_ensure_path)
+} 2>/dev/null || true`;
 }
 
 function escapeFishDoubleQuoted(value: string): string {
@@ -180,6 +183,7 @@ export ZDOTDIR="$_superset_home"
 if [[ -o interactive ]]; then
   [[ -f "$_superset_home/.zlogin" ]] && source "$_superset_home/.zlogin"
 fi
+${buildZshPrecmdHook(paths.BIN_DIR)}
 ${buildPathPrependFunction(paths.BIN_DIR)}
 rehash 2>/dev/null || true
 export ZDOTDIR="$_superset_home"
