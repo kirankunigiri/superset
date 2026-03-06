@@ -365,7 +365,7 @@ function PlansPage() {
 						<button
 							type="button"
 							onClick={() => {
-								track("enterprise_trial_requested", {
+								track("billing_support_contacted", {
 									source: "billing_plans_inline",
 								});
 								openUrl.mutate("mailto:founders@superset.sh");
