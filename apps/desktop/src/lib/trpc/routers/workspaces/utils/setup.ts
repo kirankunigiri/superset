@@ -206,7 +206,7 @@ export function loadSetupConfig({
 	const localConfig = worktreeLocal ?? readLocalConfigFromPath(mainRepoPath);
 
 	if (localConfig) {
-		const source = worktreeLocal ? worktreePath! : mainRepoPath;
+		const source = worktreeLocal && worktreePath ? worktreePath : mainRepoPath;
 		console.log(
 			`[setup] Applying local config overlay from ${join(source, PROJECT_SUPERSET_DIR_NAME, LOCAL_CONFIG_FILE_NAME)}`,
 		);

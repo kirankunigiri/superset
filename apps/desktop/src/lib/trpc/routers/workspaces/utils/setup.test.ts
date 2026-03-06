@@ -244,7 +244,10 @@ describe("config.local.json", () => {
 	test("local config with before/after merges with base setup", () => {
 		writeFileSync(
 			join(MAIN_REPO, ".superset", "config.json"),
-			JSON.stringify({ setup: ["team-setup.sh"], teardown: ["team-teardown.sh"] }),
+			JSON.stringify({
+				setup: ["team-setup.sh"],
+				teardown: ["team-teardown.sh"],
+			}),
 		);
 		writeFileSync(
 			join(MAIN_REPO, ".superset", "config.local.json"),
@@ -277,7 +280,10 @@ describe("config.local.json", () => {
 	test("local config only affects specified keys (passthrough)", () => {
 		writeFileSync(
 			join(MAIN_REPO, ".superset", "config.json"),
-			JSON.stringify({ setup: ["team-setup.sh"], teardown: ["team-teardown.sh"] }),
+			JSON.stringify({
+				setup: ["team-setup.sh"],
+				teardown: ["team-teardown.sh"],
+			}),
 		);
 		writeFileSync(
 			join(MAIN_REPO, ".superset", "config.local.json"),
@@ -322,7 +328,10 @@ describe("config.local.json", () => {
 	test("local config can mix override and merge across keys", () => {
 		writeFileSync(
 			join(MAIN_REPO, ".superset", "config.json"),
-			JSON.stringify({ setup: ["team-setup.sh"], teardown: ["team-teardown.sh"] }),
+			JSON.stringify({
+				setup: ["team-setup.sh"],
+				teardown: ["team-teardown.sh"],
+			}),
 		);
 		writeFileSync(
 			join(MAIN_REPO, ".superset", "config.local.json"),
@@ -458,10 +467,7 @@ describe("config.local.json", () => {
 
 describe("mergeConfigs", () => {
 	test("override with array", () => {
-		const result = mergeConfigs(
-			{ setup: ["a", "b"] },
-			{ setup: ["x"] },
-		);
+		const result = mergeConfigs({ setup: ["a", "b"] }, { setup: ["x"] });
 		expect(result).toEqual({ setup: ["x"] });
 	});
 
@@ -498,10 +504,7 @@ describe("mergeConfigs", () => {
 	});
 
 	test("merge when base key is undefined", () => {
-		const result = mergeConfigs(
-			{},
-			{ setup: { before: ["x"], after: ["y"] } },
-		);
+		const result = mergeConfigs({}, { setup: { before: ["x"], after: ["y"] } });
 		expect(result).toEqual({ setup: ["x", "y"] });
 	});
 
