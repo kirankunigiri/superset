@@ -363,6 +363,7 @@ export const auth = betterAuth({
 					});
 
 					if (!subscription?.stripeSubscriptionId) return;
+					if (subscription.plan === "enterprise") return;
 
 					const memberCount = await db
 						.select({ count: count() })
@@ -451,6 +452,7 @@ export const auth = betterAuth({
 					});
 
 					if (!subscription?.stripeSubscriptionId) return;
+					if (subscription.plan === "enterprise") return;
 
 					const memberCount = await db
 						.select({ count: count() })
@@ -583,6 +585,10 @@ export const auth = betterAuth({
 						priceId: env.STRIPE_PRO_MONTHLY_PRICE_ID,
 						annualDiscountPriceId: env.STRIPE_PRO_YEARLY_PRICE_ID,
 					},
+					{
+						name: "enterprise",
+						priceId: env.STRIPE_ENTERPRISE_YEARLY_PRICE_ID,
+					},
 				],
 
 				authorizeReference: async ({ user, referenceId, action }) => {
@@ -607,7 +613,13 @@ export const auth = betterAuth({
 					}
 				},
 
-				getCheckoutSessionParams: async ({ user, subscription }) => {
+				getCheckoutSessionParams: async ({ user, plan, subscription }) => {
+					if (plan.name === "enterprise") {
+						throw new Error(
+							"Enterprise subscriptions are managed by admins. Contact founders@superset.sh.",
+						);
+					}
+
 					const org = await db.query.organizations.findFirst({
 						where: eq(
 							authSchema.organizations.id,

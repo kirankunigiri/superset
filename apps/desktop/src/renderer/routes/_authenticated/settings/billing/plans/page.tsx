@@ -406,9 +406,18 @@ function PlansPage() {
 									const isCurrent = currentPlanLabel === plan.name;
 									const isDowngrade =
 										plan.id === "free" && currentPlan !== "free";
+									const isOnEnterprise = currentPlan === "enterprise";
 
 									let planActions: typeof plan.actions;
-									if (isCurrent && cancelAt) {
+									if (isOnEnterprise && !isCurrent) {
+										planActions = [
+											{
+												label: "Included in Enterprise",
+												action: "current" as const,
+												variant: "secondary" as const,
+											},
+										];
+									} else if (isCurrent && cancelAt) {
 										planActions = [
 											{
 												label: isRestoring ? "Restoring..." : "Restore plan",
