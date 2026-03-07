@@ -1,10 +1,6 @@
-import {
-	CommandDialog,
-	CommandInput,
-	CommandList,
-} from "@superset/ui/command";
-import { Tabs, TabsList, TabsTrigger } from "@superset/ui/tabs";
+import { CommandDialog, CommandInput, CommandList } from "@superset/ui/command";
 import { toast } from "@superset/ui/sonner";
+import { Tabs, TabsList, TabsTrigger } from "@superset/ui/tabs";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { electronTrpc } from "renderer/lib/electron-trpc";
@@ -114,31 +110,22 @@ export function NewWorkspaceModal() {
 
 			<CommandList className="!max-h-none flex-1 overflow-y-auto">
 				{activeTab === "pull-requests" && (
-						<PullRequestsGroup
-							projectId={selectedProjectId}
-							githubOwner={selectedProject?.githubOwner ?? null}
-							repoName={selectedProject?.name ?? null}
-							onClose={closeModal}
-						/>
-					)}
+					<PullRequestsGroup
+						projectId={selectedProjectId}
+						githubOwner={selectedProject?.githubOwner ?? null}
+						repoName={selectedProject?.name ?? null}
+						onClose={closeModal}
+					/>
+				)}
 				{activeTab === "branches" && (
-						<BranchesGroup
-							projectId={selectedProjectId}
-							onClose={closeModal}
-						/>
-					)}
+					<BranchesGroup projectId={selectedProjectId} onClose={closeModal} />
+				)}
 				{activeTab === "issues" && (
-						<IssuesGroup
-							projectId={selectedProjectId}
-							onClose={closeModal}
-						/>
-					)}
+					<IssuesGroup projectId={selectedProjectId} onClose={closeModal} />
+				)}
 				{activeTab === "prompt" && (
-						<PromptGroup
-							projectId={selectedProjectId}
-							onClose={closeModal}
-						/>
-					)}
+					<PromptGroup projectId={selectedProjectId} onClose={closeModal} />
+				)}
 			</CommandList>
 		</CommandDialog>
 	);

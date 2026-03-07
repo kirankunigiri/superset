@@ -2,22 +2,22 @@ import { Avatar } from "@superset/ui/atoms/Avatar";
 import { Button } from "@superset/ui/button";
 import { CommandEmpty, CommandGroup, CommandItem } from "@superset/ui/command";
 import { toast } from "@superset/ui/sonner";
+import { eq, isNull } from "@tanstack/db";
+import { useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
+import { useMemo } from "react";
 import { GoArrowUpRight } from "react-icons/go";
 import { HiOutlineUserCircle } from "react-icons/hi2";
 import { SiLinear } from "react-icons/si";
 import { GATED_FEATURES, usePaywall } from "renderer/components/Paywall";
-import { eq, isNull } from "@tanstack/db";
-import { useLiveQuery } from "@tanstack/react-db";
-import { useMemo } from "react";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { getSlugColumnWidth } from "renderer/lib/slug-width";
 import { useCreateWorkspace } from "renderer/react-query/workspaces";
-import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import {
 	StatusIcon,
 	type StatusType,
 } from "renderer/routes/_authenticated/_dashboard/tasks/components/TasksView/components/shared/StatusIcon";
+import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 
 interface IssuesGroupProps {
 	projectId: string | null;
@@ -49,13 +49,11 @@ export function IssuesGroup({ projectId, onClose }: IssuesGroupProps) {
 		(q) =>
 			q
 				.from({ tasks: collections.tasks })
-				.innerJoin(
-					{ status: collections.taskStatuses },
-					({ tasks, status }) => eq(tasks.statusId, status.id),
+				.innerJoin({ status: collections.taskStatuses }, ({ tasks, status }) =>
+					eq(tasks.statusId, status.id),
 				)
-				.leftJoin(
-					{ assignee: collections.users },
-					({ tasks, assignee }) => eq(tasks.assigneeId, assignee.id),
+				.leftJoin({ assignee: collections.users }, ({ tasks, assignee }) =>
+					eq(tasks.assigneeId, assignee.id),
 				)
 				.select(({ tasks, status, assignee }) => ({
 					...tasks,

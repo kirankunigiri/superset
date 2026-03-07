@@ -5,10 +5,14 @@ import { and, eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
 import { useMemo } from "react";
-import { GoArrowUpRight, GoGitPullRequest, GoGitPullRequestDraft } from "react-icons/go";
+import {
+	GoArrowUpRight,
+	GoGitPullRequest,
+	GoGitPullRequestDraft,
+} from "react-icons/go";
 import { SiGithub } from "react-icons/si";
-import { electronTrpc } from "renderer/lib/electron-trpc";
 import { GATED_FEATURES, usePaywall } from "renderer/components/Paywall";
+import { electronTrpc } from "renderer/lib/electron-trpc";
 import { useCreateFromPr } from "renderer/react-query/workspaces/useCreateFromPr";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 
@@ -54,9 +58,7 @@ export function PullRequestsGroup({
 		(q) =>
 			q
 				.from({ prs: collections.githubPullRequests })
-				.where(({ prs }) =>
-					eq(prs.repositoryId, githubRepositoryId ?? ""),
-				)
+				.where(({ prs }) => eq(prs.repositoryId, githubRepositoryId ?? ""))
 				.select(({ prs }) => ({ ...prs })),
 		[collections, githubRepositoryId],
 	);
@@ -75,10 +77,7 @@ export function PullRequestsGroup({
 	);
 
 	const openPrs = useMemo(
-		() =>
-			(pullRequests ?? [])
-				.filter((pr) => pr.state === "open")
-				.slice(0, 30),
+		() => (pullRequests ?? []).filter((pr) => pr.state === "open").slice(0, 30),
 		[pullRequests],
 	);
 
@@ -119,9 +118,7 @@ export function PullRequestsGroup({
 	if (!githubRepositoryId) {
 		return (
 			<CommandGroup>
-				<CommandEmpty>
-					No GitHub repository found.
-				</CommandEmpty>
+				<CommandEmpty>No GitHub repository found.</CommandEmpty>
 			</CommandGroup>
 		);
 	}

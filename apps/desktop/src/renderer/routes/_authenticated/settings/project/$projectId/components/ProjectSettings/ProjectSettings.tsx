@@ -419,9 +419,7 @@ export function ProjectSettings({ projectId }: ProjectSettingsProps) {
 					{!isExternalLoading && externalWorktrees.length > 0 && (
 						<div className="flex items-center justify-between">
 							<div className="space-y-0.5">
-								<Label className="text-sm font-medium">
-									Import Worktrees
-								</Label>
+								<Label className="text-sm font-medium">Import Worktrees</Label>
 								<p className="text-xs text-muted-foreground">
 									{externalWorktrees.length} external worktree
 									{externalWorktrees.length === 1 ? "" : "s"} found on disk.
@@ -431,9 +429,7 @@ export function ProjectSettings({ projectId }: ProjectSettingsProps) {
 								<Select
 									value={selectedWorktreePath ?? "__all__"}
 									onValueChange={(value) =>
-										setSelectedWorktreePath(
-											value === "__all__" ? null : value,
-										)
+										setSelectedWorktreePath(value === "__all__" ? null : value)
 									}
 								>
 									<SelectTrigger className="w-[220px]">
@@ -465,9 +461,7 @@ export function ProjectSettings({ projectId }: ProjectSettingsProps) {
 											}
 										}}
 									>
-										{openExternalWorktree.isPending
-											? "Importing..."
-											: "Import"}
+										{openExternalWorktree.isPending ? "Importing..." : "Import"}
 									</Button>
 								) : (
 									<AlertDialog>
@@ -491,9 +485,9 @@ export function ProjectSettings({ projectId }: ProjectSettingsProps) {
 													This will import {externalWorktrees.length} external
 													worktree
 													{externalWorktrees.length === 1 ? "" : "s"} into
-													Superset as workspaces. Each worktree on disk will
-													be tracked and appear in your sidebar. No files will
-													be modified.
+													Superset as workspaces. Each worktree on disk will be
+													tracked and appear in your sidebar. No files will be
+													modified.
 												</AlertDialogDescription>
 											</AlertDialogHeader>
 											<AlertDialogFooter>

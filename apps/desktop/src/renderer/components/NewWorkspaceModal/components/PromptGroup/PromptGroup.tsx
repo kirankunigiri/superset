@@ -114,9 +114,7 @@ export function PromptGroup({ projectId, onClose }: PromptGroupProps) {
 					projectId,
 					prompt: trimmedPrompt || undefined,
 				},
-				launchRequest
-					? { agentLaunchRequest: launchRequest }
-					: undefined,
+				launchRequest ? { agentLaunchRequest: launchRequest } : undefined,
 			),
 			{
 				loading: "Creating workspace...",
@@ -153,7 +151,9 @@ export function PromptGroup({ projectId, onClose }: PromptGroupProps) {
 												className="size-5 object-contain"
 											/>
 										)}
-										{agent === "superset-chat" ? "Superset" : STARTABLE_AGENT_LABELS[agent]}
+										{agent === "superset-chat"
+											? "Superset"
+											: STARTABLE_AGENT_LABELS[agent]}
 									</span>
 								</SelectItem>
 							);
@@ -176,10 +176,7 @@ export function PromptGroup({ projectId, onClose }: PromptGroupProps) {
 				}}
 			/>
 
-			<Button
-				className="w-full h-8 text-sm"
-				onClick={handleCreate}
-			>
+			<Button className="w-full h-8 text-sm" onClick={handleCreate}>
 				Create Workspace
 				<KbdGroup className="ml-1.5 opacity-70">
 					<Kbd className="bg-primary-foreground/15 text-primary-foreground h-4 min-w-4 text-[10px]">

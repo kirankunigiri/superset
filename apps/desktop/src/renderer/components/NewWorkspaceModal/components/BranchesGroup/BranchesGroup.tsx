@@ -62,9 +62,7 @@ export function BranchesGroup({ projectId, onClose }: BranchesGroupProps) {
 					loading: "Creating workspace from branch...",
 					success: "Workspace created",
 					error: (err) =>
-						err instanceof Error
-							? err.message
-							: "Failed to create workspace",
+						err instanceof Error ? err.message : "Failed to create workspace",
 				},
 			);
 		},
