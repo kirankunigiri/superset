@@ -16,6 +16,7 @@ export function ScopeToggle({
 		<div className="flex items-center gap-1 border-b px-3 py-1.5">
 			<button
 				type="button"
+				aria-pressed={scope === "workspace"}
 				onClick={() => onScopeChange("workspace")}
 				className={cn(
 					"px-2 py-0.5 rounded text-xs transition-colors truncate max-w-[200px]",
@@ -28,6 +29,7 @@ export function ScopeToggle({
 			</button>
 			<button
 				type="button"
+				aria-pressed={scope === "global"}
 				onClick={() => onScopeChange("global")}
 				className={cn(
 					"px-2 py-0.5 rounded text-xs transition-colors",

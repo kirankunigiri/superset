@@ -8,7 +8,7 @@ interface SearchDialogModeState {
 	includePattern: string;
 	excludePattern: string;
 	filtersOpen: boolean;
-	scope: SearchScope;
+	scope?: SearchScope;
 }
 
 interface SearchDialogState {
@@ -23,7 +23,6 @@ const DEFAULT_MODE_STATE: SearchDialogModeState = {
 	includePattern: "",
 	excludePattern: "",
 	filtersOpen: false,
-	scope: "workspace",
 };
 
 export const useSearchDialogStore = create<SearchDialogState>()(
