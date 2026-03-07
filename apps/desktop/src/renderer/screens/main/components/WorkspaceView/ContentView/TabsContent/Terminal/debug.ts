@@ -4,6 +4,7 @@ export const TERMINAL_DEBUG_PANE_STORAGE_KEY = "SUPERSET_TERMINAL_DEBUG_PANE";
 const TERMINAL_DEBUG_CHANNELS = [
 	"attach",
 	"connection",
+	"dom",
 	"focus",
 	"lifecycle",
 	"resize",

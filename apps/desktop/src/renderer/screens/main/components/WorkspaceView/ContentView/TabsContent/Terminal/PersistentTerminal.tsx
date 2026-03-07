@@ -7,6 +7,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { getPaneRef, subscribePaneRef } from "renderer/stores/tabs/pane-refs";
+import { terminalDebugLog } from "./debug";
 import { Terminal } from "./Terminal";
 import type { TerminalProps } from "./types";
 
@@ -29,7 +30,11 @@ export function PersistentTerminal(props: TerminalProps) {
 		if (host) {
 			setHasBeenVisible(true);
 		}
-	}, [host]);
+		terminalDebugLog("dom", paneId, "persistent-host:change", {
+			hasHost: !!host,
+			tagName: host?.tagName ?? null,
+		});
+	}, [host, paneId]);
 
 	useLayoutEffect(() => {
 		if (!host) return;
@@ -77,6 +82,10 @@ export function PersistentTerminal(props: TerminalProps) {
 	);
 
 	const target = host ?? hiddenHostRef.current;
+	terminalDebugLog("dom", paneId, "persistent-target", {
+		target: host ? "host" : "hidden-host",
+		isVisible: !!host,
+	});
 
 	return (
 		<>

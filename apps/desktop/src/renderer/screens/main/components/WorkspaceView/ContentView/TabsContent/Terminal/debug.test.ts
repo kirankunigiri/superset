@@ -47,6 +47,12 @@ describe("terminal debug switches", () => {
 		expect(channels instanceof Set && channels.has("attach")).toBe(false);
 	});
 
+	it("parses dom channel", () => {
+		const channels = parseTerminalDebugChannels("dom");
+		expect(channels).not.toBe("all");
+		expect(channels instanceof Set && channels.has("dom")).toBe(true);
+	});
+
 	it("supports pane filtering", () => {
 		localStorageMock.setItem(TERMINAL_DEBUG_STORAGE_KEY, "stream,focus");
 		localStorageMock.setItem(TERMINAL_DEBUG_PANE_STORAGE_KEY, "pane-2");

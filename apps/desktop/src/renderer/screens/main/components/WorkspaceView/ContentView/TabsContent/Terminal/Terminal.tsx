@@ -1,5 +1,5 @@
 import type { FitAddon, Terminal as XTerm } from "ghostty-web";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { useTabsStore } from "renderer/stores/tabs/store";
 import { useTerminalTheme } from "renderer/stores/theme";
@@ -239,6 +239,8 @@ export const Terminal = ({
 	const retryCountRef = useRef(0);
 	const MAX_RETRIES = 5;
 	const [isRendererReady, setIsRendererReady] = useState(false);
+	const [isInitialFontReady, setIsInitialFontReady] = useState(false);
+	const [isDisplayReady, setIsDisplayReady] = useState(false);
 
 	// Stream handling
 	const { handleTerminalExit, handleStreamError, handleStreamData } =
@@ -333,12 +335,51 @@ export const Terminal = ({
 		if (!isRestoredMode) return;
 		handleStartShell();
 	}, [isRestoredMode, handleStartShell]);
+
+	const { data: fontSettings, isPending: isFontSettingsPending } =
+		electronTrpc.settings.getFontSettings.useQuery(undefined, {
+			staleTime: 30_000,
+		});
+	const terminalFontFamily = resolveTerminalFontFamily(
+		fontSettings?.terminalFontFamily,
+	);
+	const terminalFontSize =
+		fontSettings?.terminalFontSize ?? DEFAULT_TERMINAL_FONT_SIZE;
+	const initialFontFamilyRef = useRef(terminalFontFamily);
+	const initialFontSizeRef = useRef(terminalFontSize);
+	initialFontFamilyRef.current = terminalFontFamily;
+	initialFontSizeRef.current = terminalFontSize;
+	const isTerminalBootReady =
+		isRendererReady && isInitialFontReady && !isFontSettingsPending;
+
+	useEffect(() => {
+		if (isFontSettingsPending) return;
+		if (isInitialFontReady) return;
+
+		let isCancelled = false;
+		void preloadTerminalFonts(terminalFontFamily, terminalFontSize).finally(
+			() => {
+				if (isCancelled) return;
+				setIsInitialFontReady(true);
+			},
+		);
+
+		return () => {
+			isCancelled = true;
+		};
+	}, [
+		isFontSettingsPending,
+		isInitialFontReady,
+		terminalFontFamily,
+		terminalFontSize,
+	]);
+
 	const { xtermInstance, restartTerminal } = useTerminalLifecycle({
 		paneId,
 		tabIdRef,
 		workspaceId,
 		terminalRef,
-		isRendererReady,
+		isRendererReady: isTerminalBootReady,
 		xtermRef,
 		fitAddonRef,
 		rendererRef,
@@ -349,6 +390,8 @@ export const Terminal = ({
 		isRestoredModeRef,
 		connectionErrorRef,
 		initialThemeRef,
+		initialFontFamilyRef,
+		initialFontSizeRef,
 		workspaceCwdRef,
 		handleFileLinkClickRef,
 		handleUrlClickRef,
@@ -387,20 +430,13 @@ export const Terminal = ({
 	useEffect(() => {
 		const xterm = xtermRef.current;
 		if (!xterm || !terminalTheme) return;
-		xterm.options.theme = terminalTheme;
+		// ghostty-web doesn't support runtime theme changes via options.theme.
+		// Apply theme directly to the canvas renderer and force a re-render.
+		const renderer = (xterm as unknown as { renderer?: { setTheme: (t: typeof terminalTheme) => void } }).renderer;
+		if (renderer?.setTheme) {
+			renderer.setTheme(terminalTheme);
+		}
 	}, [terminalTheme]);
-
-	const { data: fontSettings } = electronTrpc.settings.getFontSettings.useQuery(
-		undefined,
-		{
-			staleTime: 30_000,
-		},
-	);
-	const terminalFontFamily = resolveTerminalFontFamily(
-		fontSettings?.terminalFontFamily,
-	);
-	const terminalFontSize =
-		fontSettings?.terminalFontSize ?? DEFAULT_TERMINAL_FONT_SIZE;
 
 	useEffect(() => {
 		const xterm = xtermRef.current;
@@ -442,39 +478,75 @@ export const Terminal = ({
 		};
 	}, [isVisible, paneId, resizeRef, terminalFontFamily, terminalFontSize]);
 
-	useEffect(() => {
+	useLayoutEffect(() => {
 		const xterm = xtermRef.current;
 		const fitAddon = fitAddonRef.current;
-		if (!xterm || !fitAddon || !isRendererReady) return;
+		if (!isTerminalBootReady) {
+			setIsDisplayReady(false);
+			return;
+		}
+		if (!xterm || !fitAddon) return;
 
 		if (!isVisible) {
+			setIsDisplayReady(false);
 			xterm.blur();
 			return;
 		}
 
-		const frame = requestAnimationFrame(() => {
-			if (xtermRef.current !== xterm || fitAddonRef.current !== fitAddon)
-				return;
+		let isCancelled = false;
+		const syncVisibleLayout = () => {
+			if (
+				isCancelled ||
+				xtermRef.current !== xterm ||
+				fitAddonRef.current !== fitAddon
+			)
+				return false;
+
 			const proposed = fitAddon.proposeDimensions();
-			if (proposed) {
-				const sizeChanged =
-					proposed.cols !== xterm.cols || proposed.rows !== xterm.rows;
-				if (sizeChanged) {
-					resizeRef.current({
-						paneId,
-						cols: proposed.cols,
-						rows: proposed.rows,
-					});
-					xterm.resize(proposed.cols, proposed.rows);
-				}
+			if (!proposed || proposed.cols <= 0 || proposed.rows <= 0) {
+				return false;
 			}
+
+			if (proposed.cols !== xterm.cols || proposed.rows !== xterm.rows) {
+				resizeRef.current({
+					paneId,
+					cols: proposed.cols,
+					rows: proposed.rows,
+				});
+				xterm.resize(proposed.cols, proposed.rows);
+			}
+
 			if (isFocusedRef.current) {
 				xterm.focus();
 			}
+			setIsDisplayReady(true);
+			return true;
+		};
+
+		setIsDisplayReady(false);
+
+		if (syncVisibleLayout()) {
+			return () => {
+				isCancelled = true;
+			};
+		}
+
+		let frame = requestAnimationFrame(function retryVisibleLayout() {
+			if (syncVisibleLayout()) {
+				frame = 0;
+				return;
+			}
+			if (isCancelled) return;
+			frame = requestAnimationFrame(retryVisibleLayout);
 		});
 
-		return () => cancelAnimationFrame(frame);
-	}, [isRendererReady, isVisible, paneId, resizeRef, isFocusedRef]);
+		return () => {
+			isCancelled = true;
+			if (frame) {
+				cancelAnimationFrame(frame);
+			}
+		};
+	}, [isFocusedRef, isTerminalBootReady, isVisible, paneId, resizeRef, xtermInstance]);
 
 	const terminalBg = terminalTheme?.background ?? getDefaultTerminalBg();
 
@@ -519,7 +591,14 @@ export const Terminal = ({
 			{exitStatus === "killed" && !connectionError && !isRestoredMode && (
 				<SessionKilledOverlay onRestart={restartTerminal} />
 			)}
-			<div ref={terminalRef} className="h-full w-full" />
+			<div
+				ref={terminalRef}
+				className="h-full w-full"
+				style={{
+					opacity: isDisplayReady ? 1 : 0,
+					visibility: isDisplayReady ? "visible" : "hidden",
+				}}
+			/>
 		</div>
 	);
 };

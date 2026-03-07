@@ -77,7 +77,7 @@ export function TabsContent({
 				/>
 			))}
 			{tabToRender ? (
-				<TabView tab={tabToRender} />
+				<TabView key={tabToRender.id} tab={tabToRender} />
 			) : (
 				<EmptyTabView
 					defaultExternalApp={defaultExternalApp}

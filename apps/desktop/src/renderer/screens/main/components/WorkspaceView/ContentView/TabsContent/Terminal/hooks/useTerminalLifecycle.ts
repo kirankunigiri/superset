@@ -1,16 +1,10 @@
-import type {
-	FitAddon,
-	IDisposable,
-	ITheme,
-	Terminal as XTerm,
-} from "ghostty-web";
+import type { FitAddon, ITheme, Terminal as XTerm } from "ghostty-web";
 import type { MutableRefObject, RefObject } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTabsStore } from "renderer/stores/tabs/store";
 import { killTerminalForPane } from "renderer/stores/tabs/utils/terminal-cleanup";
 import { scheduleTerminalAttach } from "../attach-scheduler";
 import { isCommandEchoed, sanitizeForTitle } from "../commandBuffer";
-import { FIRST_RENDER_RESTORE_FALLBACK_MS } from "../config";
 import { terminalDebugLog } from "../debug";
 import {
 	createTerminalInstance,
@@ -97,6 +91,8 @@ export interface UseTerminalLifecycleOptions {
 	isRestoredModeRef: MutableRefObject<boolean>;
 	connectionErrorRef: MutableRefObject<string | null>;
 	initialThemeRef: MutableRefObject<ITheme | null>;
+	initialFontFamilyRef: MutableRefObject<string>;
+	initialFontSizeRef: MutableRefObject<number>;
 	workspaceCwdRef: MutableRefObject<string | null>;
 	handleFileLinkClickRef: MutableRefObject<
 		(path: string, line?: number, column?: number) => void
@@ -159,6 +155,8 @@ export function useTerminalLifecycle({
 	isRestoredModeRef,
 	connectionErrorRef,
 	initialThemeRef,
+	initialFontFamilyRef,
+	initialFontSizeRef,
 	workspaceCwdRef,
 	handleFileLinkClickRef,
 	handleUrlClickRef,
@@ -227,6 +225,8 @@ export function useTerminalLifecycle({
 		} = createTerminalInstance(container, {
 			cwd: workspaceCwdRef.current ?? undefined,
 			initialTheme: initialThemeRef.current,
+			initialFontFamily: initialFontFamilyRef.current,
+			initialFontSize: initialFontSizeRef.current,
 			onFileLinkClick: (path, line, column) =>
 				handleFileLinkClickRef.current(path, line, column),
 			onUrlClickRef: handleUrlClickRef,
@@ -254,30 +254,12 @@ export function useTerminalLifecycle({
 			xterm.blur();
 		}
 
-		// Wait for first render before applying restoration
-		let renderDisposable: IDisposable | null = null;
-		let firstRenderFallback: ReturnType<typeof setTimeout> | null = null;
-
-		renderDisposable = xterm.onRender(() => {
-			if (firstRenderFallback) {
-				clearTimeout(firstRenderFallback);
-				firstRenderFallback = null;
-			}
-			renderDisposable?.dispose();
-			renderDisposable = null;
-			didFirstRenderRef.current = true;
-			terminalDebugLog("restore", paneId, "first-render");
-			maybeApplyInitialState();
-		});
-
-		firstRenderFallback = setTimeout(() => {
-			if (isUnmounted || didFirstRenderRef.current) return;
-			didFirstRenderRef.current = true;
-			terminalDebugLog("restore", paneId, "first-render:fallback-timeout", {
-				timeoutMs: FIRST_RENDER_RESTORE_FALLBACK_MS,
-			});
-			maybeApplyInitialState();
-		}, FIRST_RENDER_RESTORE_FALLBACK_MS);
+		// ghostty-web renders synchronously in open() and starts its own
+		// requestAnimationFrame render loop — it never fires the onRender event.
+		// Mark first render as done immediately so restoration can proceed.
+		didFirstRenderRef.current = true;
+		terminalDebugLog("restore", paneId, "first-render:immediate");
+		maybeApplyInitialState();
 
 		const restartTerminalSession = () => {
 			terminalDebugLog("attach", paneId, "restartSession", {
@@ -550,8 +532,10 @@ export function useTerminalLifecycle({
 		registerGetSelectionCallbackRef.current(paneId, handleGetSelection);
 		registerPasteCallbackRef.current(paneId, handlePaste);
 
-		const cleanupFocus = setupFocusListener(xterm, () =>
-			handleTerminalFocusRef.current(),
+		const cleanupFocus = setupFocusListener(
+			xterm,
+			() => handleTerminalFocusRef.current(),
+			paneId,
 		);
 		const cleanupResize = setupResizeHandlers(
 			container,
@@ -680,7 +664,6 @@ export function useTerminalLifecycle({
 				cancelAttachWait = null;
 			}
 			clearAttachInFlight(paneId, cleanupAttachId);
-			if (firstRenderFallback) clearTimeout(firstRenderFallback);
 			cancelReattachRecovery();
 			document.removeEventListener("visibilitychange", handleVisibilityChange);
 			window.removeEventListener("focus", handleWindowFocus);
@@ -717,7 +700,6 @@ export function useTerminalLifecycle({
 			didFirstRenderRef.current = false;
 			pendingInitialStateRef.current = null;
 			resetModes();
-			renderDisposable?.dispose();
 
 			xterm.blur();
 			xterm.dispose();

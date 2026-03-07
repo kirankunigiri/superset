@@ -16,6 +16,7 @@ import {
 	getTerminalColors,
 } from "shared/themes";
 import { RESIZE_DEBOUNCE_MS, TERMINAL_OPTIONS } from "./config";
+import { terminalDebugLog } from "./debug";
 import { FilePathLinkProvider, UrlLinkProvider } from "./link-providers";
 import { scrollToBottom } from "./utils";
 
@@ -70,6 +71,8 @@ export type TerminalRenderer = {
 export interface CreateTerminalOptions {
 	cwd?: string;
 	initialTheme?: ITheme | null;
+	initialFontFamily?: string;
+	initialFontSize?: number;
 	onFileLinkClick?: (path: string, line?: number, column?: number) => void;
 	onUrlClickRef?: { current: ((url: string) => void) | undefined };
 }
@@ -93,6 +96,8 @@ export function createTerminalInstance(
 	const {
 		cwd,
 		initialTheme,
+		initialFontFamily,
+		initialFontSize,
 		onFileLinkClick,
 		onUrlClickRef: urlClickRef,
 	} = options;
@@ -102,7 +107,12 @@ export function createTerminalInstance(
 
 	// Use provided theme, or fall back to localStorage-based default to prevent flash
 	const theme = initialTheme ?? getDefaultTerminalTheme();
-	const terminalOptions = { ...TERMINAL_OPTIONS, theme };
+	const terminalOptions = {
+		...TERMINAL_OPTIONS,
+		theme,
+		fontFamily: initialFontFamily ?? TERMINAL_OPTIONS.fontFamily,
+		fontSize: initialFontSize ?? TERMINAL_OPTIONS.fontSize,
+	};
 	const xterm = new XTerm(terminalOptions);
 	const fitAddon = new FitAddon();
 
@@ -114,7 +124,30 @@ export function createTerminalInstance(
 		},
 	};
 
-	xterm.open(container);
+	// ghostty-web hardcodes canvas getContext("2d", { alpha: true }) which forces
+	// grayscale antialiasing. Temporarily patch to use alpha: false so the browser
+	// can use subpixel (LCD) antialiasing for much sharper text on macOS/Retina.
+	const origGetContext = HTMLCanvasElement.prototype.getContext;
+	// biome-ignore lint/suspicious/noExplicitAny: patching native API
+	(HTMLCanvasElement.prototype as any).getContext = function (
+		type: string,
+		// biome-ignore lint/suspicious/noExplicitAny: patching native API
+		options?: any,
+	) {
+		if (type === "2d") {
+			return origGetContext.call(this, type, { ...options, alpha: false });
+		}
+		return origGetContext.call(this, type, options);
+	};
+	try {
+		xterm.open(container);
+	} finally {
+		HTMLCanvasElement.prototype.getContext = origGetContext;
+	}
+	if (xterm.element) {
+		xterm.element.style.caretColor = "transparent";
+		xterm.element.style.outline = "none";
+	}
 	xterm.loadAddon(fitAddon);
 
 	const urlLinkProvider = new UrlLinkProvider(xterm, (_event, uri) => {
@@ -567,17 +600,34 @@ export function setupKeyboardHandler(
 export function setupFocusListener(
 	xterm: XTerm,
 	onFocus: () => void,
+	paneId?: string,
 ): (() => void) | null {
 	const textarea = xterm.textarea;
 	const element = xterm.element;
 	if (!textarea && !element) return null;
 
-	textarea?.addEventListener("focus", onFocus);
-	element?.addEventListener("focus", onFocus);
+	const handleTextareaFocus = () => {
+		terminalDebugLog("dom", paneId, "focus-surface:textarea", {
+			activeElement: document.activeElement?.tagName ?? null,
+			caretColor: textarea?.style.caretColor ?? null,
+		});
+		onFocus();
+	};
+	const handleElementFocus = () => {
+		terminalDebugLog("dom", paneId, "focus-surface:element", {
+			activeElement: document.activeElement?.tagName ?? null,
+			contentEditable: element?.getAttribute("contenteditable") ?? null,
+			caretColor: element?.style.caretColor ?? null,
+		});
+		onFocus();
+	};
+
+	textarea?.addEventListener("focus", handleTextareaFocus);
+	element?.addEventListener("focus", handleElementFocus);
 
 	return () => {
-		textarea?.removeEventListener("focus", onFocus);
-		element?.removeEventListener("focus", onFocus);
+		textarea?.removeEventListener("focus", handleTextareaFocus);
+		element?.removeEventListener("focus", handleElementFocus);
 	};
 }
 
