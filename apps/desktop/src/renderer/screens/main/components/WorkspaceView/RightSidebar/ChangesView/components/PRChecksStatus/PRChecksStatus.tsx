@@ -62,7 +62,8 @@ export function PRChecksStatus({ pr }: PRChecksStatusProps) {
 
 	if (total === 0) return null;
 
-	const checksIcon = checkIconConfig[pr.checksStatus === "none" ? "pending" : pr.checksStatus];
+	const checksIcon =
+		checkIconConfig[pr.checksStatus === "none" ? "pending" : pr.checksStatus];
 
 	return (
 		<div className="px-2 pt-1 pb-1.5">
