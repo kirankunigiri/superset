@@ -33,8 +33,6 @@ function run() {
 	addIcon(manifest.file);
 	addIcon(manifest.folder);
 	addIcon(manifest.folderExpanded);
-	addIcon(manifest.rootFolder);
-	addIcon(manifest.rootFolderExpanded);
 
 	// File mappings
 	for (const icon of Object.values(manifest.fileNames ?? {})) addIcon(icon);
@@ -45,15 +43,6 @@ function run() {
 	for (const icon of Object.values(manifest.folderNames ?? {})) addIcon(icon);
 	for (const icon of Object.values(manifest.folderNamesExpanded ?? {}))
 		addIcon(icon);
-
-	// Root folder mappings
-	for (const icon of Object.values(manifest.rootFolderNames ?? {}))
-		addIcon(icon);
-	for (const icon of Object.values(manifest.rootFolderNamesExpanded ?? {}))
-		addIcon(icon);
-
-	// Language ID mappings
-	for (const icon of Object.values(manifest.languageIds ?? {})) addIcon(icon);
 
 	// Build condensed manifest
 	const condensed: CondensedManifest = {

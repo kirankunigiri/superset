@@ -49,19 +49,18 @@ export function getFileIcon(
 		return { src: `/file-icons/${manifest.fileNames[fileNameLower]}.svg` };
 	}
 
-	// Check file extension
-	const ext = getExtension(fileName);
-	if (ext && manifest.fileExtensions[ext]) {
-		return { src: `/file-icons/${manifest.fileExtensions[ext]}.svg` };
+	// Check file extensions (try compound extensions first, e.g. "d.ts" before "ts")
+	const dotIndex = fileName.indexOf(".");
+	if (dotIndex !== -1) {
+		const afterFirstDot = fileName.slice(dotIndex + 1).toLowerCase();
+		const segments = afterFirstDot.split(".");
+		for (let i = 0; i < segments.length; i++) {
+			const ext = segments.slice(i).join(".");
+			if (manifest.fileExtensions[ext]) {
+				return { src: `/file-icons/${manifest.fileExtensions[ext]}.svg` };
+			}
+		}
 	}
 
 	return { src: `/file-icons/${manifest.defaultIcon}.svg` };
-}
-
-function getExtension(fileName: string): string | null {
-	const parts = fileName.split(".");
-	if (parts.length > 1) {
-		return parts[parts.length - 1].toLowerCase();
-	}
-	return null;
 }
