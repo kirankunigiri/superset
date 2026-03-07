@@ -216,6 +216,7 @@ export async function POST(request: Request) {
 							githubPullRequests.prNumber,
 						],
 						set: {
+							organizationId: dbRepo.organizationId,
 							headSha: pr.head.sha,
 							title: pr.title,
 							state: pr.state,

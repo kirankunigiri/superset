@@ -169,7 +169,7 @@ export function PromptGroup({ projectId, onClose }: PromptGroupProps) {
 				value={prompt}
 				onChange={(e) => setPrompt(e.target.value)}
 				onKeyDown={(e) => {
-					if (e.key === "Enter" && e.metaKey) {
+					if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
 						e.preventDefault();
 						handleCreate();
 					}

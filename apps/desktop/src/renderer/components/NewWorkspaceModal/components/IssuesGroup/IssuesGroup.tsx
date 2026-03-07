@@ -17,6 +17,7 @@ import {
 	StatusIcon,
 	type StatusType,
 } from "renderer/routes/_authenticated/_dashboard/tasks/components/TasksView/components/shared/StatusIcon";
+import { navigateToWorkspace } from "renderer/routes/_authenticated/_dashboard/utils/workspace-navigation";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 
 interface IssuesGroupProps {
@@ -67,15 +68,15 @@ export function IssuesGroup({ projectId, onClose }: IssuesGroupProps) {
 	const { data: allWorkspaces = [] } =
 		electronTrpc.workspaces.getAll.useQuery();
 
-	const openBranches = useMemo(
-		() =>
-			new Set(
-				allWorkspaces
-					.filter((w) => w.projectId === projectId)
-					.map((w) => w.branch),
-			),
-		[allWorkspaces, projectId],
-	);
+	const workspaceByBranch = useMemo(() => {
+		const map = new Map<string, string>();
+		for (const w of allWorkspaces) {
+			if (w.projectId === projectId) {
+				map.set(w.branch, w.id);
+			}
+		}
+		return map;
+	}, [allWorkspaces, projectId]);
 
 	const tasks = useMemo(() => data ?? [], [data]);
 
@@ -122,6 +123,12 @@ export function IssuesGroup({ projectId, onClose }: IssuesGroupProps) {
 							toast.error("Select a project first");
 							return;
 						}
+						const existingId = workspaceByBranch.get(task.slug.toLowerCase());
+						if (existingId) {
+							onClose();
+							navigateToWorkspace(existingId, navigate);
+							return;
+						}
 						onClose();
 						toast.promise(
 							createWorkspace.mutateAsync({
@@ -141,7 +148,7 @@ export function IssuesGroup({ projectId, onClose }: IssuesGroupProps) {
 					}}
 					className="group h-12"
 				>
-					{openBranches.has(task.slug.toLowerCase()) ? (
+					{workspaceByBranch.has(task.slug.toLowerCase()) ? (
 						<GoArrowUpRight className="size-4 shrink-0 text-muted-foreground" />
 					) : (
 						<StatusIcon
@@ -170,7 +177,8 @@ export function IssuesGroup({ projectId, onClose }: IssuesGroupProps) {
 						)}
 					</span>
 					<span className="text-xs text-muted-foreground shrink-0 hidden group-data-[selected=true]:inline">
-						{openBranches.has(task.slug.toLowerCase()) ? "Open" : "Create"} ↵
+						{workspaceByBranch.has(task.slug.toLowerCase()) ? "Open" : "Create"}{" "}
+						↵
 					</span>
 				</CommandItem>
 			))}

@@ -14,6 +14,7 @@ import { SiGithub } from "react-icons/si";
 import { GATED_FEATURES, usePaywall } from "renderer/components/Paywall";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { useCreateFromPr } from "renderer/react-query/workspaces/useCreateFromPr";
+import { navigateToWorkspace } from "renderer/routes/_authenticated/_dashboard/utils/workspace-navigation";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 
 interface PullRequestsGroupProps {
@@ -66,15 +67,15 @@ export function PullRequestsGroup({
 	const { data: allWorkspaces = [] } =
 		electronTrpc.workspaces.getAll.useQuery();
 
-	const openBranches = useMemo(
-		() =>
-			new Set(
-				allWorkspaces
-					.filter((w) => w.projectId === projectId)
-					.map((w) => w.branch),
-			),
-		[allWorkspaces, projectId],
-	);
+	const workspaceByBranch = useMemo(() => {
+		const map = new Map<string, string>();
+		for (const w of allWorkspaces) {
+			if (w.projectId === projectId) {
+				map.set(w.branch, w.id);
+			}
+		}
+		return map;
+	}, [allWorkspaces, projectId]);
 
 	const openPrs = useMemo(
 		() => (pullRequests ?? []).filter((pr) => pr.state === "open").slice(0, 30),
@@ -135,6 +136,12 @@ export function PullRequestsGroup({
 							toast.error("Select a project first");
 							return;
 						}
+						const existingId = workspaceByBranch.get(pr.headBranch);
+						if (existingId) {
+							onClose();
+							navigateToWorkspace(existingId, navigate);
+							return;
+						}
 						onClose();
 						toast.promise(
 							createFromPr.mutateAsync({
@@ -153,7 +160,7 @@ export function PullRequestsGroup({
 					}}
 					className="group h-12"
 				>
-					{openBranches.has(pr.headBranch) ? (
+					{workspaceByBranch.has(pr.headBranch) ? (
 						<GoArrowUpRight className="size-4 shrink-0 text-muted-foreground" />
 					) : pr.isDraft ? (
 						<GoGitPullRequestDraft className="size-4 shrink-0 text-muted-foreground" />
@@ -171,7 +178,7 @@ export function PullRequestsGroup({
 						{pr.authorLogin}
 					</span>
 					<span className="text-xs text-muted-foreground shrink-0 hidden group-data-[selected=true]:inline">
-						{openBranches.has(pr.headBranch) ? "Open" : "Create"} ↵
+						{workspaceByBranch.has(pr.headBranch) ? "Open" : "Create"} ↵
 					</span>
 				</CommandItem>
 			))}
