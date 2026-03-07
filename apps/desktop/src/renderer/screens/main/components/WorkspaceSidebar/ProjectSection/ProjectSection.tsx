@@ -259,10 +259,10 @@ export function ProjectSection({
 									"transition-colors",
 									ungroupedDropZone.isDragOver &&
 										"bg-primary/5 ring-1 ring-inset ring-primary/30 rounded-sm",
+									ungroupedDropZone.isDragOver &&
+										workspaces.length === 0 &&
+										"min-h-8",
 								)}
-								style={{
-									minHeight: workspaces.length === 0 ? "2rem" : undefined,
-								}}
 							>
 								<WorkspaceList
 									workspaces={workspaces}

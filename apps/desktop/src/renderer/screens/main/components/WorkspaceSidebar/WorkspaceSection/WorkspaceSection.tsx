@@ -232,7 +232,12 @@ export function WorkspaceSection({
 	return (
 		<div
 			{...dropZone.handlers}
-			className={cn(isSectionDragging && "opacity-30")}
+			className={cn("ml-3", isSectionDragging && "opacity-30")}
+			style={{
+				borderLeft: hasColor
+					? `2px solid ${color}`
+					: "2px solid var(--color-border)",
+			}}
 		>
 			<ContextMenu>
 				<ContextMenuTrigger asChild>
@@ -241,7 +246,7 @@ export function WorkspaceSection({
 							sectionDrag(sectionDrop(node));
 						}}
 						className={cn(
-							"flex items-center w-full pl-3 pr-2 py-1.5 text-[11px] font-medium uppercase tracking-wider",
+							"flex items-center w-full pl-2 pr-2 py-2 text-[11px] font-medium uppercase tracking-wider",
 							"text-muted-foreground hover:bg-muted/50 transition-colors",
 							dropZone.isDragOver && "bg-primary/10 ring-1 ring-primary/40",
 						)}
@@ -270,12 +275,6 @@ export function WorkspaceSection({
 										!isCollapsed && "rotate-90",
 									)}
 								/>
-								{hasColor && (
-									<span
-										className="size-2 rounded-full shrink-0"
-										style={{ backgroundColor: color }}
-									/>
-								)}
 								<span className="truncate">{name}</span>
 								<span className="text-[10px] tabular-nums font-normal">
 									({workspaces.length})
@@ -349,14 +348,7 @@ export function WorkspaceSection({
 						transition={{ duration: 0.15, ease: "easeOut" }}
 						className="overflow-hidden"
 					>
-						<div
-							className="pl-2 ml-3"
-							style={
-								hasColor
-									? { borderLeft: `2px solid ${color}` }
-									: { borderLeft: "2px solid var(--color-border)" }
-							}
-						>
+						<div className="pl-2">
 							<WorkspaceList
 								workspaces={workspaces}
 								shortcutBaseIndex={shortcutBaseIndex}
