@@ -256,12 +256,16 @@ export function ProjectSection({
 							<div
 								{...ungroupedDropZone.handlers}
 								className={cn(
-									"transition-colors",
-									ungroupedDropZone.isDragOver &&
-										"bg-primary/5 ring-1 ring-inset ring-primary/30 rounded-sm",
-									ungroupedDropZone.isDragOver &&
+									"transition-colors rounded-sm",
+									ungroupedDropZone.isDropTarget &&
+										!ungroupedDropZone.isDragOver &&
+										"border border-dashed border-primary/20",
+									(ungroupedDropZone.isDropTarget ||
+										ungroupedDropZone.isDragOver) &&
 										workspaces.length === 0 &&
 										"min-h-8",
+									ungroupedDropZone.isDragOver &&
+										"bg-primary/5 border-solid border-primary/30",
 								)}
 							>
 								<WorkspaceList

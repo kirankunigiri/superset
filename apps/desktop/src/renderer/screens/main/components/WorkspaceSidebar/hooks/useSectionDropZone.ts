@@ -3,7 +3,10 @@ import {
 	useMoveWorkspacesToSection,
 	useMoveWorkspaceToSection,
 } from "renderer/react-query/workspaces";
-import { getActiveDragItem } from "renderer/stores/active-drag-item";
+import {
+	getActiveDragItem,
+	useActiveDragItemStore,
+} from "renderer/stores/active-drag-item";
 import type { DragItem } from "../types";
 
 interface UseSectionDropZoneOptions {
@@ -18,6 +21,10 @@ export function useSectionDropZone({
 	onAutoExpand,
 }: UseSectionDropZoneOptions) {
 	const [isDragOver, setIsDragOver] = useState(false);
+	const activeDragItem = useActiveDragItemStore(
+		(state) => state.activeDragItem,
+	);
+	const isDropTarget = activeDragItem !== null && canAccept(activeDragItem);
 	const dragEnterCount = useRef(0);
 	const autoExpandTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const moveToSection = useMoveWorkspaceToSection();
@@ -108,6 +115,7 @@ export function useSectionDropZone({
 
 	return {
 		isDragOver,
+		isDropTarget,
 		handlers: {
 			onDragOver: handleDragOver,
 			onDrop: handleDrop,

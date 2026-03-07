@@ -248,7 +248,11 @@ export function WorkspaceSection({
 						className={cn(
 							"flex items-center w-full pl-2 pr-2 py-2 text-[11px] font-medium uppercase tracking-wider",
 							"text-muted-foreground hover:bg-muted/50 transition-colors",
-							dropZone.isDragOver && "bg-primary/10 ring-1 ring-primary/40",
+							dropZone.isDropTarget &&
+								!dropZone.isDragOver &&
+								"border border-dashed border-primary/20 rounded-sm",
+							dropZone.isDragOver &&
+								"bg-primary/10 border border-solid border-primary/40 rounded-sm",
 						)}
 						style={{ cursor: isSectionDragging ? "grabbing" : "grab" }}
 					>
