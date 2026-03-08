@@ -58,7 +58,9 @@ export function AssigneeFilter({ value, onChange }: AssigneeFilterProps) {
 		if (value.startsWith("ext:")) {
 			const extId = value.slice(4);
 			const ext = externalAssignees.find((e) => e.id === extId);
-			return ext ? { id: value, name: ext.name || "External" } : null;
+			return ext
+				? { id: value, name: ext.name || "External", image: ext.avatar }
+				: null;
 		}
 		return users.find((u) => u.id === value) || null;
 	}, [value, users, externalAssignees]);
