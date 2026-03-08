@@ -410,7 +410,7 @@ export const Terminal = ({ paneId, tabId, workspaceId }: TerminalProps) => {
 	return (
 		<div
 			role="application"
-			className="relative h-full w-full overflow-hidden ring-1 ring-inset ring-border/40"
+			className="relative h-full w-full overflow-hidden"
 			style={{ backgroundColor: terminalBg }}
 			onDragOver={handleDragOver}
 			onDrop={handleDrop}
@@ -424,7 +424,9 @@ export const Terminal = ({ paneId, tabId, workspaceId }: TerminalProps) => {
 			{exitStatus === "killed" && !connectionError && !isRestoredMode && (
 				<SessionKilledOverlay onRestart={restartTerminal} />
 			)}
-			<div ref={terminalRef} className="h-full w-full" />
+			<div className="h-full w-full p-2">
+				<div ref={terminalRef} className="h-full w-full" />
+			</div>
 		</div>
 	);
 };
