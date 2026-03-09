@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { db } from "@superset/db/client";
 import { taskStatuses, tasks, users } from "@superset/db/schema";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { getMcpContext } from "../../utils";
@@ -62,7 +62,9 @@ export function register(server: McpServer) {
 					statusType: status.type,
 					statusColor: status.color,
 					assigneeId: tasks.assigneeId,
-					assigneeName: assignee.name,
+					assigneeName: sql<
+						string | null
+					>`coalesce(${assignee.name}, ${tasks.assigneeDisplayName})`,
 					assigneeEmail: assignee.email,
 					assigneeExternalId: tasks.assigneeExternalId,
 					assigneeDisplayName: tasks.assigneeDisplayName,

@@ -192,8 +192,8 @@ export function register(server: McpServer) {
 					statusType: status.type,
 					assigneeId: tasks.assigneeId,
 					assigneeName: sql<
-					string | null
-				>`coalesce(${assignee.name}, ${tasks.assigneeDisplayName})`,
+						string | null
+					>`coalesce(${assignee.name}, ${tasks.assigneeDisplayName})`,
 					assigneeExternalId: tasks.assigneeExternalId,
 					assigneeDisplayName: tasks.assigneeDisplayName,
 					assigneeAvatarUrl: tasks.assigneeAvatarUrl,

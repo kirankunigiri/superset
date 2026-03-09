@@ -3,6 +3,7 @@ import { db } from "@superset/db/client";
 import type { LinearConfig, SelectTask } from "@superset/db/schema";
 import {
 	integrationConnections,
+	members,
 	taskStatuses,
 	tasks,
 	users,
@@ -59,15 +60,22 @@ async function findLinearState(
 
 async function resolveLinearAssigneeId(
 	client: LinearClient,
+	organizationId: string,
 	userId: string,
 ): Promise<string | undefined> {
-	const assigneeUser = await db.query.users.findFirst({
-		where: eq(users.id, userId),
-	});
-	if (!assigneeUser?.email) return undefined;
+	const matchedUser = await db
+		.select({ email: users.email })
+		.from(users)
+		.innerJoin(members, eq(members.userId, users.id))
+		.where(
+			and(eq(users.id, userId), eq(members.organizationId, organizationId)),
+		)
+		.limit(1)
+		.then((rows) => rows[0]);
+	if (!matchedUser?.email) return undefined;
 
 	const linearUsers = await client.users({
-		filter: { email: { eq: assigneeUser.email } },
+		filter: { email: { eq: matchedUser.email } },
 	});
 	const linearUser = linearUsers.nodes[0];
 	if (linearUsers.nodes.length === 1 && linearUser) {
@@ -111,7 +119,11 @@ async function syncTaskToLinear(
 				linearAssigneeId = null;
 			} else if (task.assigneeId) {
 				linearAssigneeId =
-					(await resolveLinearAssigneeId(client, task.assigneeId)) ?? undefined;
+					(await resolveLinearAssigneeId(
+						client,
+						task.organizationId,
+						task.assigneeId,
+					)) ?? undefined;
 			}
 
 			const result = await client.updateIssue(task.externalId, {
@@ -151,7 +163,11 @@ async function syncTaskToLinear(
 
 		// Resolve assignee for Linear (create)
 		const createAssigneeId = task.assigneeId
-			? await resolveLinearAssigneeId(client, task.assigneeId)
+			? await resolveLinearAssigneeId(
+					client,
+					task.organizationId,
+					task.assigneeId,
+				)
 			: undefined;
 
 		const result = await client.createIssue({
