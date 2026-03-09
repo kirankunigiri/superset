@@ -130,7 +130,7 @@ function getPlatformAstGrepCandidates(): string[] {
 		if (targetArch === "arm64") {
 			return ["@ast-grep/napi-linux-arm64-gnu"];
 		}
-		return ["@ast-grep/napi-linux-x64-gnu"];
+		return ["@ast-grep/napi-linux-x64-gnu", "@ast-grep/napi-linux-x64-musl"];
 	}
 
 	if (targetPlatform === "win32") {
