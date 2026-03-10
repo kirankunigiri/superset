@@ -86,7 +86,9 @@ export function AssigneeFilter({ value, onChange }: AssigneeFilterProps) {
 
 	const filteredExternal = useMemo(
 		() =>
-			externalAssignees.filter((e) => e.name?.toLowerCase().includes(query)),
+			externalAssignees.filter(
+				(e) => !query || e.name?.toLowerCase().includes(query),
+			),
 		[externalAssignees, query],
 	);
 
