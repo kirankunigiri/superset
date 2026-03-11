@@ -2,6 +2,10 @@ import { describe, expect, it } from "bun:test";
 import { parseUserMentions } from "./parseUserMentions";
 
 describe("parseUserMentions", () => {
+	it("returns empty text segment for empty string", () => {
+		expect(parseUserMentions("")).toEqual([{ type: "text", value: "" }]);
+	});
+
 	it("parses a single file mention", () => {
 		expect(parseUserMentions("check @package.json please")).toEqual([
 			{ type: "text", value: "check " },
@@ -148,6 +152,18 @@ describe("parseUserMentions", () => {
 					slug: "SUPER-123",
 				},
 				{ type: "text", value: ", please" },
+			]);
+		});
+
+		it("handles task slug containing colon", () => {
+			expect(parseUserMentions("see @task:SUPER-123:foo for details")).toEqual([
+				{ type: "text", value: "see " },
+				{
+					type: "task-mention",
+					raw: "@task:SUPER-123:foo",
+					slug: "SUPER-123:foo",
+				},
+				{ type: "text", value: " for details" },
 			]);
 		});
 

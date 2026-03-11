@@ -12,13 +12,13 @@ import { useCallback, useRef, useState } from "react";
 import { useHotkeyText } from "renderer/stores/hotkeys";
 import type { SlashCommand } from "../../hooks/useSlashCommands";
 import type { ModelOption, PermissionMode } from "../../types";
+import { IssueLinkCommand } from "../IssueLinkCommand";
 import { MentionAnchor, MentionProvider } from "../MentionPopover";
 import { SlashCommandInput } from "../SlashCommandInput";
 import { ChatComposerControls } from "./components/ChatComposerControls";
 import { ChatInputDropZone } from "./components/ChatInputDropZone";
 import { ChatShortcuts } from "./components/ChatShortcuts";
 import { FileDropOverlay } from "./components/FileDropOverlay";
-import { IssueLinkInserter } from "./components/IssueLinkInserter";
 import { LinkedIssues } from "./components/LinkedIssues";
 import { SlashCommandPreview } from "./components/SlashCommandPreview";
 import type { LinkedIssue } from "./types";
@@ -26,7 +26,6 @@ import { getErrorMessage } from "./utils/getErrorMessage";
 
 interface ChatInputFooterProps {
 	cwd: string;
-	workspaceId: string;
 	isFocused: boolean;
 	error: unknown;
 	canAbort: boolean;
@@ -52,7 +51,6 @@ interface ChatInputFooterProps {
 
 export function ChatInputFooter({
 	cwd,
-	workspaceId: _workspaceId,
 	isFocused,
 	error,
 	canAbort,
@@ -156,10 +154,10 @@ export function ChatInputFooter({
 											setIssueLinkOpen={setIssueLinkOpen}
 											inputRootRef={inputRootRef}
 										/>
-										<IssueLinkInserter
-											issueLinkOpen={issueLinkOpen}
-											setIssueLinkOpen={setIssueLinkOpen}
-											onSelectTask={addLinkedIssue}
+										<IssueLinkCommand
+											open={issueLinkOpen}
+											onOpenChange={setIssueLinkOpen}
+											onSelect={addLinkedIssue}
 										/>
 										<FileDropOverlay visible={dragType === "files"} />
 										<PromptInputAttachments>

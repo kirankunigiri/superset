@@ -14,17 +14,9 @@ export function LinkedIssuePill({
 	onRemove,
 }: LinkedIssuePillProps) {
 	return (
-		// biome-ignore lint/a11y/useSemanticElements: Contains nested interactive elements
 		<div
-			role="button"
-			tabIndex={0}
 			title={title}
-			className="group flex cursor-pointer items-center gap-2.5 rounded-md border border-border/50 bg-muted/60 px-3 py-2 text-sm transition-all select-none hover:bg-accent hover:ring-1 hover:ring-border active:scale-[0.98] dark:hover:bg-accent/50"
-			onKeyDown={(e) => {
-				if (e.key === "Enter" || e.key === " ") {
-					// placeholder for future task viewer open
-				}
-			}}
+			className="group flex items-center gap-2.5 rounded-md border border-border/50 bg-muted/60 px-3 py-2 text-sm transition-all select-none hover:bg-accent hover:ring-1 hover:ring-border dark:hover:bg-accent/50"
 		>
 			<div className="relative flex size-7 shrink-0 items-center justify-center rounded-md bg-foreground/10 p-0.5">
 				<LinearIcon className="size-5 rounded-sm transition-opacity group-hover:opacity-0" />
@@ -44,7 +36,7 @@ export function LinkedIssuePill({
 			</div>
 			<div className="flex flex-col items-start leading-tight">
 				<span className="max-w-[180px] truncate font-medium">
-					{title ?? slug}
+					{title || slug}
 				</span>
 				<div className="flex items-center gap-1.5 text-muted-foreground text-[10px] uppercase tracking-widest">
 					<span className="max-w-[80px] truncate">{slug}</span>

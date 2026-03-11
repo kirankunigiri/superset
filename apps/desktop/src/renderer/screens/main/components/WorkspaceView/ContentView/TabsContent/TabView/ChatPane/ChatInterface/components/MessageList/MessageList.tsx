@@ -11,6 +11,7 @@ import { FileIcon, FileTextIcon, ImageIcon } from "lucide-react";
 import { useCallback } from "react";
 import { HiMiniChatBubbleLeftRight } from "react-icons/hi2";
 import { useTabsStore } from "renderer/stores/tabs/store";
+import { FileMentionChip } from "../../../../components/FileMentionChip";
 import { LinkedTaskChip } from "../../../../components/LinkedTaskChip";
 import { parseUserMentions } from "../../../../utils/parseUserMentions";
 import type { InterruptedMessagePreview } from "../../types";
@@ -187,10 +188,10 @@ export function MessageList({
 														Boolean(normalizedPath) && Boolean(workspaceId);
 
 													return (
-														<button
-															type="button"
+														<FileMentionChip
 															key={`${msg.id}-seg-${segIdx}`}
-															className="mx-0.5 inline-flex items-center gap-0.5 rounded-md bg-primary/15 px-1.5 py-0.5 font-mono text-xs text-primary transition-colors hover:bg-primary/22 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-default disabled:opacity-60"
+															relativePath={segment.relativePath}
+															disabled={!canOpen}
 															onClick={() => {
 																if (!normalizedPath || !workspaceId) return;
 																addFileViewerPane(workspaceId, {
@@ -198,16 +199,7 @@ export function MessageList({
 																	isPinned: true,
 																});
 															}}
-															disabled={!canOpen}
-															aria-label={`Open file ${segment.relativePath}`}
-														>
-															<span className="font-semibold text-primary">
-																@
-															</span>
-															<span className="text-primary/95">
-																{segment.relativePath}
-															</span>
-														</button>
+														/>
 													);
 												}
 												return null;

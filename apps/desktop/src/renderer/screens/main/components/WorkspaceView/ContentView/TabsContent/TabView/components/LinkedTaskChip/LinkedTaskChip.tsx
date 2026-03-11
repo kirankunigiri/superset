@@ -27,7 +27,7 @@ export function LinkedTaskChip({ slug }: LinkedTaskChipProps) {
 			</div>
 			<div className="flex flex-col items-start leading-tight">
 				<span className="max-w-[180px] truncate font-medium">
-					{title ?? slug}
+					{title || slug}
 				</span>
 				<div className="flex items-center gap-1.5 text-muted-foreground text-[10px] uppercase tracking-widest">
 					<span className="max-w-[80px] truncate">{slug}</span>
