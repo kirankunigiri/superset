@@ -85,8 +85,8 @@ export function PullRequestsGroup({
 			[...(pullRequests ?? [])].sort((a, b) => {
 				if (a.state === "open" && b.state !== "open") return -1;
 				if (a.state !== "open" && b.state === "open") return 1;
-				const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-				const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+				const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+				const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
 				return bTime - aTime;
 			}),
 		[pullRequests],
