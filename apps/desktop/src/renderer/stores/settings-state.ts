@@ -1,10 +1,6 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 
-/**
- * Settings sections available in the settings view.
- * General sections are the main categories, project/workspace are dynamic.
- */
 export type SettingsSection =
 	| "account"
 	| "organization"
@@ -14,6 +10,7 @@ export type SettingsSection =
 	| "behavior"
 	| "git"
 	| "terminal"
+	| "models"
 	| "integrations"
 	| "billing"
 	| "devices"
@@ -26,12 +23,14 @@ interface SettingsState {
 	activeProjectId: string | null;
 	searchQuery: string;
 	isOpen: boolean;
+	originRoute: string;
 
 	setActiveSection: (section: SettingsSection) => void;
 	setActiveProject: (projectId: string | null) => void;
 	setSearchQuery: (query: string) => void;
 	openSettings: (section?: SettingsSection) => void;
 	closeSettings: () => void;
+	setOriginRoute: (route: string) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -41,6 +40,7 @@ export const useSettingsStore = create<SettingsState>()(
 			activeProjectId: null,
 			searchQuery: "",
 			isOpen: false,
+			originRoute: "/workspace",
 
 			setActiveSection: (section) => set({ activeSection: section }),
 
@@ -63,12 +63,13 @@ export const useSettingsStore = create<SettingsState>()(
 					isOpen: false,
 					searchQuery: "",
 				}),
+
+			setOriginRoute: (route) => set({ originRoute: route }),
 		}),
 		{ name: "SettingsStore" },
 	),
 );
 
-// Convenience hooks
 export const useSettingsSection = () =>
 	useSettingsStore((state) => state.activeSection);
 export const useSetSettingsSection = () =>
@@ -81,3 +82,5 @@ export const useActiveProjectId = () =>
 	useSettingsStore((state) => state.activeProjectId);
 export const useCloseSettings = () =>
 	useSettingsStore((state) => state.closeSettings);
+export const useSettingsOriginRoute = () =>
+	useSettingsStore((state) => state.originRoute);

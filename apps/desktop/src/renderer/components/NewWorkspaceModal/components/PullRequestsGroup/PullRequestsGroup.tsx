@@ -4,6 +4,7 @@ import { toast } from "@superset/ui/sonner";
 import { and, eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
+import Fuse from "fuse.js";
 import { useMemo } from "react";
 import {
 	GoArrowUpRight,
@@ -12,6 +13,7 @@ import {
 } from "react-icons/go";
 import { SiGithub } from "react-icons/si";
 import { GATED_FEATURES, usePaywall } from "renderer/components/Paywall";
+import { useDebouncedValue } from "renderer/hooks/useDebouncedValue";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { useCreateFromPr } from "renderer/react-query/workspaces/useCreateFromPr";
 import { navigateToWorkspace } from "renderer/routes/_authenticated/_dashboard/utils/workspace-navigation";
@@ -33,7 +35,8 @@ export function PullRequestsGroup({
 	const navigate = useNavigate();
 	const { gateFeature } = usePaywall();
 	const createFromPr = useCreateFromPr();
-	const { closeAndResetDraft, runAsyncAction } = useNewWorkspaceModalDraft();
+	const { draft, closeAndResetDraft, runAsyncAction } =
+		useNewWorkspaceModalDraft();
 
 	// Match GitHub repository by owner + name from the local project
 	const { data: repoData } = useLiveQuery(
@@ -54,7 +57,7 @@ export function PullRequestsGroup({
 
 	const githubRepositoryId = repoData?.[0]?.id ?? null;
 
-	// Query open PRs for this repository
+	// Query PRs for this repository
 	const { data: pullRequests } = useLiveQuery(
 		(q) =>
 			q
@@ -77,10 +80,47 @@ export function PullRequestsGroup({
 		return map;
 	}, [allWorkspaces, projectId]);
 
-	const openPrs = useMemo(
-		() => (pullRequests ?? []).filter((pr) => pr.state === "open").slice(0, 30),
+	const allPrs = useMemo(
+		() =>
+			[...(pullRequests ?? [])].sort((a, b) => {
+				if (a.state === "open" && b.state !== "open") return -1;
+				if (a.state !== "open" && b.state === "open") return 1;
+				const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+				const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+				return bTime - aTime;
+			}),
 		[pullRequests],
 	);
+
+	const debouncedQuery = useDebouncedValue(draft.pullRequestsQuery, 150);
+
+	const prFuse = useMemo(
+		() =>
+			new Fuse(allPrs, {
+				keys: [
+					{ name: "title", weight: 2 },
+					{ name: "authorLogin", weight: 1 },
+					{ name: "prNumber", weight: 1 },
+				],
+				threshold: 0.3,
+				includeScore: true,
+				ignoreLocation: true,
+			}),
+		[allPrs],
+	);
+
+	const visiblePrs = useMemo(() => {
+		const query = debouncedQuery.trim();
+		if (!query) {
+			return allPrs.slice(0, 100);
+		}
+		const urlMatch = allPrs.find((pr) => pr.url === query);
+		if (urlMatch) return [urlMatch];
+		return prFuse
+			.search(query)
+			.slice(0, 100)
+			.map((result) => result.item);
+	}, [debouncedQuery, allPrs, prFuse]);
 
 	if (!projectId) {
 		return (
@@ -127,10 +167,9 @@ export function PullRequestsGroup({
 	return (
 		<CommandGroup>
 			<CommandEmpty>No pull requests found.</CommandEmpty>
-			{openPrs.map((pr) => (
+			{visiblePrs.map((pr) => (
 				<CommandItem
 					key={pr.id}
-					value={`#${pr.prNumber} ${pr.title} ${pr.authorLogin} ${pr.url}`}
 					onSelect={() => {
 						if (!projectId) {
 							toast.error("Select a project first");
