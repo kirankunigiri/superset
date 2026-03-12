@@ -13,6 +13,13 @@ export type LinkedIssue = {
 	title: string;
 };
 
+export type LinkedPR = {
+	prNumber: number;
+	title: string;
+	url: string;
+	state: string;
+};
+
 export interface NewWorkspaceModalDraft {
 	selectedProjectId: string | null;
 	prompt: string;
@@ -21,6 +28,7 @@ export interface NewWorkspaceModalDraft {
 	workspaceName: string;
 	workspaceNameEdited: boolean;
 	linkedIssues: LinkedIssue[];
+	linkedPR: LinkedPR | null;
 }
 
 interface NewWorkspaceModalDraftState extends NewWorkspaceModalDraft {
@@ -35,6 +43,7 @@ const initialDraft: NewWorkspaceModalDraft = {
 	workspaceName: "",
 	workspaceNameEdited: false,
 	linkedIssues: [],
+	linkedPR: null,
 };
 
 function buildInitialDraftState(): NewWorkspaceModalDraftState {
@@ -133,6 +142,7 @@ export function NewWorkspaceModalDraftProvider({
 				workspaceName: state.workspaceName,
 				workspaceNameEdited: state.workspaceNameEdited,
 				linkedIssues: state.linkedIssues,
+				linkedPR: state.linkedPR,
 			},
 			draftVersion: state.draftVersion,
 			closeModal: onClose,

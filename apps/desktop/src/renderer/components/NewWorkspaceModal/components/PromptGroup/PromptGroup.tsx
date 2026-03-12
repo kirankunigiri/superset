@@ -56,7 +56,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GoGitBranch } from "react-icons/go";
 import { HiCheck, HiChevronUpDown } from "react-icons/hi2";
-import { LuFolderGit, LuFolderOpen } from "react-icons/lu";
+import { LuFolderGit, LuFolderOpen, LuGitPullRequest } from "react-icons/lu";
 import { SiLinear } from "react-icons/si";
 import {
 	getPresetIcon,
@@ -66,12 +66,16 @@ import { electronTrpc } from "renderer/lib/electron-trpc";
 import { formatRelativeTime } from "renderer/lib/formatRelativeTime";
 import { resolveEffectiveWorkspaceBaseBranch } from "renderer/lib/workspaceBaseBranch";
 import { useCreateWorkspace } from "renderer/react-query/workspaces";
+import { useCreateFromPr } from "renderer/react-query/workspaces/useCreateFromPr";
 import { ProjectThumbnail } from "renderer/screens/main/components/WorkspaceSidebar/ProjectSection/ProjectThumbnail";
 import { LinkedIssuePill } from "renderer/screens/main/components/WorkspaceView/ContentView/TabsContent/TabView/ChatPane/ChatInterface/components/ChatInputFooter/components/LinkedIssuePill";
 import { IssueLinkCommand } from "renderer/screens/main/components/WorkspaceView/ContentView/TabsContent/TabView/ChatPane/ChatInterface/components/IssueLinkCommand";
 import { useHotkeysStore } from "renderer/stores/hotkeys/store";
 import { sanitizeBranchNameWithMaxLength } from "shared/utils/branch";
+import type { LinkedPR } from "../../NewWorkspaceModalDraftContext";
 import { useNewWorkspaceModalDraft } from "../../NewWorkspaceModalDraftContext";
+import { LinkedPRPill } from "./components/LinkedPRPill";
+import { PRLinkCommand } from "./components/PRLinkCommand";
 
 type WorkspaceCreateAgent = StartableAgentType | "none";
 
@@ -112,7 +116,13 @@ export function PromptGroup(props: PromptGroupProps) {
 	);
 }
 
-function PlusMenu({ onOpenIssueLink }: { onOpenIssueLink: () => void }) {
+function PlusMenu({
+	onOpenIssueLink,
+	onOpenPRLink,
+}: {
+	onOpenIssueLink: () => void;
+	onOpenPRLink: () => void;
+}) {
 	const attachments = usePromptInputAttachments();
 
 	return (
@@ -130,6 +140,10 @@ function PlusMenu({ onOpenIssueLink }: { onOpenIssueLink: () => void }) {
 				<DropdownMenuItem onSelect={onOpenIssueLink}>
 					<SiLinear className="size-4" />
 					Link issue
+				</DropdownMenuItem>
+				<DropdownMenuItem onSelect={onOpenPRLink}>
+					<LuGitPullRequest className="size-4" />
+					Link pull request
 				</DropdownMenuItem>
 			</DropdownMenuContent>
 		</DropdownMenu>
@@ -268,7 +282,13 @@ function BaseBranchPickerInline({
 	}
 
 	return (
-		<Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) setBranchSearch(""); }}>
+		<Popover
+			open={open}
+			onOpenChange={(v) => {
+				setOpen(v);
+				if (!v) setBranchSearch("");
+			}}
+		>
 			<PopoverTrigger asChild>
 				<button
 					type="button"
@@ -276,9 +296,7 @@ function BaseBranchPickerInline({
 					className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
 				>
 					<GoGitBranch className="size-3 shrink-0" />
-					<span className="font-mono">
-						{effectiveBaseBranch || "..."}
-					</span>
+					<span className="font-mono">{effectiveBaseBranch || "..."}</span>
 					<HiChevronUpDown className="size-3 shrink-0" />
 				</button>
 			</PopoverTrigger>
@@ -353,6 +371,7 @@ function PromptGroupInner({
 		workspaceName,
 		workspaceNameEdited,
 		linkedIssues,
+		linkedPR,
 	} = draft;
 	const runSetupScriptRef = useRef(runSetupScript);
 	runSetupScriptRef.current = runSetupScript;
@@ -371,7 +390,9 @@ function PromptGroupInner({
 				: "none";
 		},
 	);
+	const createFromPr = useCreateFromPr();
 	const [issueLinkOpen, setIssueLinkOpen] = useState(false);
+	const [prLinkOpen, setPRLinkOpen] = useState(false);
 	const trimmedPrompt = prompt.trim();
 	const firstIssueSlug = linkedIssues[0]?.slug ?? null;
 
@@ -404,7 +425,10 @@ function PromptGroupInner({
 	});
 
 	const branchSlug = sanitizeBranchNameWithMaxLength(
-		trimmedPrompt || firstIssueSlug || "",
+		trimmedPrompt ||
+			firstIssueSlug ||
+			(linkedPR ? `pr-${linkedPR.prNumber}` : "") ||
+			"",
 	);
 
 	const previousProjectIdRef = useRef(projectId);
@@ -483,6 +507,22 @@ function PromptGroupInner({
 			return;
 		}
 
+		// If a PR is linked, use createFromPr instead of regular create
+		if (linkedPR) {
+			void runAsyncAction(
+				createFromPr.mutateAsync({ projectId, prUrl: linkedPR.url }),
+				{
+					loading: `Creating workspace from PR #${linkedPR.prNumber}...`,
+					success: "Workspace created from PR",
+					error: (err) =>
+						err instanceof Error
+							? err.message
+							: "Failed to create workspace from PR",
+				},
+			);
+			return;
+		}
+
 		let convertedFiles: ConvertedFile[] | undefined;
 		if (attachments.files.length > 0) {
 			convertedFiles = await Promise.all(
@@ -522,7 +562,9 @@ function PromptGroupInner({
 		branchSlug,
 		buildLaunchRequest,
 		convertBlobUrlToDataUrl,
+		createFromPr,
 		createWorkspace,
+		linkedPR,
 		projectId,
 		runAsyncAction,
 		trimmedPrompt,
@@ -547,6 +589,14 @@ function PromptGroupInner({
 		updateDraft({
 			linkedIssues: linkedIssues.filter((issue) => issue.slug !== slug),
 		});
+	};
+
+	const setLinkedPR = (pr: LinkedPR) => {
+		updateDraft({ linkedPR: pr });
+	};
+
+	const removeLinkedPR = () => {
+		updateDraft({ linkedPR: null });
 	};
 
 	const agentIcon =
@@ -584,9 +634,27 @@ function PromptGroupInner({
 				maxFileSize={10 * 1024 * 1024}
 				className="[&>[data-slot=input-group]]:rounded-[13px] [&>[data-slot=input-group]]:border-[0.5px] [&>[data-slot=input-group]]:shadow-none [&>[data-slot=input-group]]:bg-foreground/[0.02]"
 			>
-				{(linkedIssues.length > 0 || attachments.files.length > 0) && (
+				{(linkedPR ||
+					linkedIssues.length > 0 ||
+					attachments.files.length > 0) && (
 					<div className="flex flex-wrap items-start gap-2 px-3 pt-3 self-stretch">
 						<AnimatePresence initial={false}>
+							{linkedPR && (
+								<motion.div
+									key="linked-pr"
+									initial={{ opacity: 0, scale: 0.8 }}
+									animate={{ opacity: 1, scale: 1 }}
+									exit={{ opacity: 0, scale: 0.8 }}
+									transition={{ duration: 0.15 }}
+								>
+									<LinkedPRPill
+										prNumber={linkedPR.prNumber}
+										title={linkedPR.title}
+										state={linkedPR.state}
+										onRemove={removeLinkedPR}
+									/>
+								</motion.div>
+							)}
 							{linkedIssues.map((issue) => (
 								<motion.div
 									key={issue.slug}
@@ -676,16 +744,19 @@ function PromptGroupInner({
 						/>
 					</PromptInputTools>
 					<div className="flex items-center gap-2">
-						<PlusMenu onOpenIssueLink={() => setIssueLinkOpen(true)} />
+						<PlusMenu
+							onOpenIssueLink={() => setIssueLinkOpen(true)}
+							onOpenPRLink={() => setPRLinkOpen(true)}
+						/>
 						<PromptInputSubmit
 							className="size-[22px] rounded-full border border-transparent bg-foreground/10 shadow-none p-[5px] hover:bg-foreground/20"
-							disabled={createWorkspace.isPending}
+							disabled={createWorkspace.isPending || createFromPr.isPending}
 							onClick={(e) => {
 								e.preventDefault();
 								void handleCreate();
 							}}
 						>
-							{createWorkspace.isPending ? (
+							{createWorkspace.isPending || createFromPr.isPending ? (
 								<Loader2Icon className="size-3.5 animate-spin text-muted-foreground" />
 							) : (
 								<ArrowUpIcon className="size-3.5 text-muted-foreground" />
@@ -696,14 +767,16 @@ function PromptGroupInner({
 			</PromptInput>
 
 			<div className="flex items-center justify-between">
-				<BaseBranchPickerInline
-					effectiveBaseBranch={effectiveBaseBranch}
-					defaultBranch={branchData?.defaultBranch}
-					isBranchesLoading={isBranchesLoading}
-					isBranchesError={isBranchesError}
-					branches={branchData?.branches ?? []}
-					onSelectBaseBranch={handleBaseBranchSelect}
-				/>
+				{!linkedPR && (
+					<BaseBranchPickerInline
+						effectiveBaseBranch={effectiveBaseBranch}
+						defaultBranch={branchData?.defaultBranch}
+						isBranchesLoading={isBranchesLoading}
+						isBranchesError={isBranchesError}
+						branches={branchData?.branches ?? []}
+						onSelectBaseBranch={handleBaseBranchSelect}
+					/>
+				)}
 				<span className="text-[11px] text-muted-foreground/50">
 					{modKey}+↵ to create
 				</span>
@@ -713,6 +786,13 @@ function PromptGroupInner({
 				open={issueLinkOpen}
 				onOpenChange={setIssueLinkOpen}
 				onSelect={addLinkedIssue}
+			/>
+
+			<PRLinkCommand
+				open={prLinkOpen}
+				onOpenChange={setPRLinkOpen}
+				onSelect={setLinkedPR}
+				projectId={projectId}
 			/>
 		</div>
 	);
