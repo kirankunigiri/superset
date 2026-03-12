@@ -45,9 +45,11 @@ export function V2NewWorkspaceModalContent({
 	useEffect(() => {
 		if (!isOpen) return;
 
+		// Only use preSelectedProjectId if it matches an actual v2 project
 		if (
 			preSelectedProjectId &&
-			preSelectedProjectId !== draft.selectedProjectId
+			preSelectedProjectId !== draft.selectedProjectId &&
+			v2Projects.some((p) => p.id === preSelectedProjectId)
 		) {
 			updateDraft({ selectedProjectId: preSelectedProjectId });
 			return;
@@ -93,13 +95,16 @@ export function V2NewWorkspaceModalContent({
 	const { data: localProjects = [] } =
 		electronTrpc.projects.getRecents.useQuery();
 
-	// Resolve: match local project by github owner + repo name
+	// Resolve: match local project by github owner + repo name (or directory basename)
 	const resolvedLocalProjectId = useMemo(() => {
 		if (!githubRepo) return null;
-		const match = localProjects.find(
-			(lp) =>
-				lp.githubOwner === githubRepo.owner && lp.name === githubRepo.name,
-		);
+		const match = localProjects.find((lp) => {
+			if (lp.githubOwner !== githubRepo.owner) return false;
+			if (lp.name === githubRepo.name) return true;
+			// Fallback: check directory basename in case user renamed the project
+			const dirName = lp.mainRepoPath?.split("/").pop();
+			return dirName === githubRepo.name;
+		});
 		return match?.id ?? null;
 	}, [githubRepo, localProjects]);
 

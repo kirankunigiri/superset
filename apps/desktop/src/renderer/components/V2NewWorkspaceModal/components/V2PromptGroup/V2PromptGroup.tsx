@@ -215,6 +215,7 @@ export function V2PromptGroup({
 					onSelectBaseBranch={handleBaseBranchSelect}
 					runSetupScript={false}
 					onRunSetupScriptChange={() => {}}
+					hideSetupScript
 				/>
 			)}
 
