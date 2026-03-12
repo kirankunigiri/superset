@@ -1,6 +1,9 @@
 import { LuPlus } from "react-icons/lu";
+import { useOpenNewWorkspaceModal } from "renderer/stores/new-workspace-modal";
 
 export function V2SidebarHeader() {
+	const openModal = useOpenNewWorkspaceModal();
+
 	return (
 		<div className="flex items-center justify-between border-b border-border px-3 py-2">
 			<div>
@@ -9,8 +12,8 @@ export function V2SidebarHeader() {
 			</div>
 			<button
 				type="button"
-				disabled
-				className="rounded-md p-1 text-muted-foreground opacity-50"
+				onClick={() => openModal()}
+				className="rounded-md p-1 text-muted-foreground hover:text-foreground transition-colors"
 			>
 				<LuPlus className="size-4" />
 			</button>
