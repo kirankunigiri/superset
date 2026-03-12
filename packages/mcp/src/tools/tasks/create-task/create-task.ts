@@ -16,9 +16,7 @@ const DEFAULT_STATUSES: Array<
 	{ name: "Canceled", color: "#95a2b3", type: "canceled", position: 4 },
 ];
 
-async function ensureDefaultStatuses(
-	organizationId: string,
-): Promise<string> {
+async function ensureDefaultStatuses(organizationId: string): Promise<string> {
 	const [existing] = await db
 		.select({ id: taskStatuses.id })
 		.from(taskStatuses)

@@ -1,5 +1,10 @@
 import { db } from "@superset/db/client";
-import { integrationConnections, type LinearConfig } from "@superset/db/schema";
+import {
+	integrationConnections,
+	type LinearConfig,
+	taskStatuses,
+	tasks,
+} from "@superset/db/schema";
 import type { TRPCRouterRecord } from "@trpc/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
@@ -28,15 +33,35 @@ export const linearRouter = {
 		.mutation(async ({ ctx, input }) => {
 			await verifyOrgAdmin(ctx.session.user.id, input.organizationId);
 
-			const result = await db
-				.delete(integrationConnections)
-				.where(
-					and(
-						eq(integrationConnections.organizationId, input.organizationId),
-						eq(integrationConnections.provider, "linear"),
-					),
-				)
-				.returning({ id: integrationConnections.id });
+			const result = await db.transaction(async (tx) => {
+				await tx
+					.delete(tasks)
+					.where(
+						and(
+							eq(tasks.organizationId, input.organizationId),
+							eq(tasks.externalProvider, "linear"),
+						),
+					);
+
+				await tx
+					.delete(taskStatuses)
+					.where(
+						and(
+							eq(taskStatuses.organizationId, input.organizationId),
+							eq(taskStatuses.externalProvider, "linear"),
+						),
+					);
+
+				return tx
+					.delete(integrationConnections)
+					.where(
+						and(
+							eq(integrationConnections.organizationId, input.organizationId),
+							eq(integrationConnections.provider, "linear"),
+						),
+					)
+					.returning({ id: integrationConnections.id });
+			});
 
 			if (result.length === 0) {
 				return { success: false, error: "No connection found" };
