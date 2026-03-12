@@ -234,10 +234,12 @@ async function getPRForBranch(
  * Handles fork PRs where the local branch is prefixed with the fork owner
  * (e.g. local "owner/feature" matches PR headRefName "feature").
  */
-export function branchMatchesPR(localBranch: string, prHeadRefName: string): boolean {
+export function branchMatchesPR(
+	localBranch: string,
+	prHeadRefName: string,
+): boolean {
 	return (
-		localBranch === prHeadRefName ||
-		localBranch.endsWith(`/${prHeadRefName}`)
+		localBranch === prHeadRefName || localBranch.endsWith(`/${prHeadRefName}`)
 	);
 }
 

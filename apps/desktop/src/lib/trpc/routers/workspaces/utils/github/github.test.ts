@@ -7,15 +7,21 @@ describe("branchMatchesPR", () => {
 	});
 
 	test("matches fork PR with owner prefix", () => {
-		expect(branchMatchesPR("forkowner/feature/my-thing", "feature/my-thing")).toBe(true);
+		expect(
+			branchMatchesPR("forkowner/feature/my-thing", "feature/my-thing"),
+		).toBe(true);
 	});
 
 	test("rejects different branch name", () => {
-		expect(branchMatchesPR("feature/new-thing", "feature/old-thing")).toBe(false);
+		expect(branchMatchesPR("feature/new-thing", "feature/old-thing")).toBe(
+			false,
+		);
 	});
 
 	test("rejects stale tracking ref mismatch", () => {
-		expect(branchMatchesPR("kitenite/fix-bug", "someone-else/old-pr")).toBe(false);
+		expect(branchMatchesPR("kitenite/fix-bug", "someone-else/old-pr")).toBe(
+			false,
+		);
 	});
 
 	test("rejects partial suffix match that is not a path segment", () => {
