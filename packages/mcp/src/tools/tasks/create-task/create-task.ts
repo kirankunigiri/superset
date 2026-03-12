@@ -1,9 +1,54 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { db, dbWs } from "@superset/db/client";
+import type { InsertTaskStatus } from "@superset/db/schema";
 import { taskStatuses, tasks } from "@superset/db/schema";
 import { and, eq, ilike, or } from "drizzle-orm";
 import { z } from "zod";
 import { getMcpContext } from "../../utils";
+
+const DEFAULT_STATUSES: Array<
+	Pick<InsertTaskStatus, "name" | "color" | "type" | "position">
+> = [
+	{ name: "Backlog", color: "#95a2b3", type: "backlog", position: 0 },
+	{ name: "Todo", color: "#e2e2e2", type: "unstarted", position: 1 },
+	{ name: "In Progress", color: "#f2c94c", type: "started", position: 2 },
+	{ name: "Done", color: "#0e9f6e", type: "completed", position: 3 },
+	{ name: "Canceled", color: "#95a2b3", type: "canceled", position: 4 },
+];
+
+async function ensureDefaultStatuses(
+	organizationId: string,
+): Promise<string> {
+	const [existing] = await db
+		.select({ id: taskStatuses.id })
+		.from(taskStatuses)
+		.where(
+			and(
+				eq(taskStatuses.organizationId, organizationId),
+				eq(taskStatuses.type, "backlog"),
+			),
+		)
+		.orderBy(taskStatuses.position)
+		.limit(1);
+
+	if (existing) return existing.id;
+
+	const rows = DEFAULT_STATUSES.map((s) => ({
+		...s,
+		organizationId,
+	}));
+
+	const created = await dbWs.transaction(async (tx) => {
+		return tx
+			.insert(taskStatuses)
+			.values(rows)
+			.returning({ id: taskStatuses.id, type: taskStatuses.type });
+	});
+
+	const backlog = created.find((s) => s.type === "backlog");
+	if (!backlog) throw new Error("Failed to seed default task statuses");
+	return backlog.id;
+}
 
 const PRIORITIES = ["urgent", "high", "medium", "low", "none"] as const;
 type TaskPriority = (typeof PRIORITIES)[number];
@@ -89,25 +134,7 @@ export function register(server: McpServer) {
 			const needsDefaultStatus = taskInputs.some((t) => !t.statusId);
 
 			if (needsDefaultStatus) {
-				const [defaultStatus] = await db
-					.select({ id: taskStatuses.id })
-					.from(taskStatuses)
-					.where(
-						and(
-							eq(taskStatuses.organizationId, ctx.organizationId),
-							eq(taskStatuses.type, "backlog"),
-						),
-					)
-					.orderBy(taskStatuses.position)
-					.limit(1);
-
-				defaultStatusId = defaultStatus?.id;
-				if (!defaultStatusId) {
-					return {
-						content: [{ type: "text", text: "Error: No default status found" }],
-						isError: true,
-					};
-				}
+				defaultStatusId = await ensureDefaultStatuses(ctx.organizationId);
 			}
 
 			const baseSlugs = taskInputs.map((t) => generateBaseSlug(t.title));
