@@ -26,6 +26,8 @@ Returns:
 
 Text or byte reads. `offset` and `maxBytes` support paged reads. Returns opaque `revision` token.
 
+If `encoding` is provided, returns `kind: "text"` with `content: string`. If omitted, returns `kind: "bytes"` with `content: Uint8Array`.
+
 If `exceededLimit` is `true`, more data is available and the client can continue with a larger `offset`.
 
 ```ts
@@ -101,7 +103,7 @@ Returns:
 
 ### `createDirectory`
 
-File creation happens through `writeFile`.
+File creation happens through `writeFile`. Idempotent — succeeds silently if the directory already exists.
 
 ```ts
 createDirectory({ absolutePath: string })
@@ -129,7 +131,7 @@ Returns:
 
 ### `movePath`
 
-Rename is a same-parent move.
+Rename is a same-parent move. Fails if destination already exists.
 
 ```ts
 movePath({ sourceAbsolutePath: string, destinationAbsolutePath: string })
