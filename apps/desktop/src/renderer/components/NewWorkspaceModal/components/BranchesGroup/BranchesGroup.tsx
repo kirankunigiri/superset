@@ -3,7 +3,7 @@ import { CommandEmpty, CommandGroup, CommandItem } from "@superset/ui/command";
 import { toast } from "@superset/ui/sonner";
 import { cn } from "@superset/ui/utils";
 import { useNavigate } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GoArrowUpRight, GoGitBranch, GoGlobe } from "react-icons/go";
 import { useDebouncedValue } from "renderer/hooks/useDebouncedValue";
 import { electronTrpc } from "renderer/lib/electron-trpc";
@@ -216,6 +216,24 @@ export function BranchesGroup({ projectId }: BranchesGroupProps) {
 
 	const visibleBranchRows =
 		filterMode === "worktrees" ? worktreeBranchRows : serverBranchRows;
+
+	// Infinite scroll: load more when sentinel is visible
+	const sentinelRef = useRef<HTMLDivElement>(null);
+	const hasMore = filterMode === "all" && (effectiveData?.hasMore ?? false);
+	useEffect(() => {
+		const el = sentinelRef.current;
+		if (!el || !hasMore || isFetching) return;
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0]?.isIntersecting) {
+					setDisplayLimit((prev) => prev + PAGE_SIZE);
+				}
+			},
+			{ threshold: 0 },
+		);
+		observer.observe(el);
+		return () => observer.disconnect();
+	}, [hasMore, isFetching]);
 
 	const handleCreate = useCallback(
 		(branchName: string) => {
@@ -457,15 +475,13 @@ export function BranchesGroup({ projectId }: BranchesGroupProps) {
 						</CommandItem>
 					);
 				})}
-				{filterMode === "all" && effectiveData?.hasMore && (
-					<CommandItem
-						onSelect={() => setDisplayLimit((prev) => prev + PAGE_SIZE)}
-						className="justify-center text-muted-foreground"
+				{hasMore && (
+					<div
+						ref={sentinelRef}
+						className="flex items-center justify-center py-2 text-xs text-muted-foreground"
 					>
-						{isFetching
-							? "Loading..."
-							: `Show more branches (${effectiveData.totalCount - displayLimit} remaining)`}
-					</CommandItem>
+						{isFetching ? "Loading more..." : ""}
+					</div>
 				)}
 			</CommandGroup>
 		</>

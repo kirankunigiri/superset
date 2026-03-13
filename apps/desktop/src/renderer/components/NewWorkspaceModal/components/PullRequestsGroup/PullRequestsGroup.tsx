@@ -5,7 +5,7 @@ import { and, eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
 import Fuse from "fuse.js";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
 	GoArrowUpRight,
 	GoGitPullRequest,
@@ -133,6 +133,23 @@ export function PullRequestsGroup({
 	);
 	const hasMore = allMatchingPrs.length > displayLimit;
 
+	// Infinite scroll: load more when sentinel is visible
+	const sentinelRef = useRef<HTMLDivElement>(null);
+	useEffect(() => {
+		const el = sentinelRef.current;
+		if (!el || !hasMore) return;
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0]?.isIntersecting) {
+					setDisplayLimit((prev) => prev + PAGE_SIZE);
+				}
+			},
+			{ threshold: 0 },
+		);
+		observer.observe(el);
+		return () => observer.disconnect();
+	}, [hasMore]);
+
 	if (!projectId) {
 		return (
 			<CommandGroup>
@@ -232,13 +249,10 @@ export function PullRequestsGroup({
 				</CommandItem>
 			))}
 			{hasMore && (
-				<CommandItem
-					onSelect={() => setDisplayLimit((prev) => prev + PAGE_SIZE)}
-					className="justify-center text-muted-foreground"
-				>
-					Show more pull requests ({allMatchingPrs.length - displayLimit}{" "}
-					remaining)
-				</CommandItem>
+				<div
+					ref={sentinelRef}
+					className="flex items-center justify-center py-2 text-xs text-muted-foreground"
+				/>
 			)}
 		</CommandGroup>
 	);

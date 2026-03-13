@@ -5,7 +5,7 @@ import { toast } from "@superset/ui/sonner";
 import { eq, isNull } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { GoArrowUpRight } from "react-icons/go";
 import { HiOutlineUserCircle } from "react-icons/hi2";
 import { SiLinear } from "react-icons/si";
@@ -111,6 +111,23 @@ export function IssuesGroup({ projectId }: IssuesGroupProps) {
 	);
 	const hasMore = allMatchingTasks.length > displayLimit;
 
+	// Infinite scroll: load more when sentinel is visible
+	const sentinelRef = useRef<HTMLDivElement>(null);
+	useEffect(() => {
+		const el = sentinelRef.current;
+		if (!el || !hasMore) return;
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0]?.isIntersecting) {
+					setDisplayLimit((prev) => prev + PAGE_SIZE);
+				}
+			},
+			{ threshold: 0 },
+		);
+		observer.observe(el);
+		return () => observer.disconnect();
+	}, [hasMore]);
+
 	const slugWidth = useMemo(
 		() => getSlugColumnWidth(visibleTasks.map((t) => t.slug)),
 		[visibleTasks],
@@ -212,12 +229,10 @@ export function IssuesGroup({ projectId }: IssuesGroupProps) {
 				</CommandItem>
 			))}
 			{hasMore && (
-				<CommandItem
-					onSelect={() => setDisplayLimit((prev) => prev + PAGE_SIZE)}
-					className="justify-center text-muted-foreground"
-				>
-					Show more issues ({allMatchingTasks.length - displayLimit} remaining)
-				</CommandItem>
+				<div
+					ref={sentinelRef}
+					className="flex items-center justify-center py-2 text-xs text-muted-foreground"
+				/>
 			)}
 		</CommandGroup>
 	);
