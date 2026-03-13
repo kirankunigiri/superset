@@ -30,6 +30,7 @@ import { getCodeSyntaxHighlighting } from "renderer/screens/main/components/Work
 import { useResolvedTheme } from "renderer/stores/theme";
 import { createCodeMirrorTheme } from "./createCodeMirrorTheme";
 import { loadLanguageSupport } from "./loadLanguageSupport";
+import { createValueSyncGuard, shouldSyncValue } from "./valueSyncGuard";
 
 interface CodeEditorProps {
 	value: string;
@@ -177,6 +178,7 @@ export function CodeEditor({
 	const editableCompartment = useRef(new Compartment()).current;
 	const onChangeRef = useRef(onChange);
 	const onSaveRef = useRef(onSave);
+	const valueSyncGuard = useRef(createValueSyncGuard(value)).current;
 	const { data: fontSettings } = electronTrpc.settings.getFontSettings.useQuery(
 		undefined,
 		{
@@ -280,7 +282,7 @@ export function CodeEditor({
 		if (!view) return;
 
 		const currentValue = view.state.doc.toString();
-		if (currentValue === value) return;
+		if (!shouldSyncValue(valueSyncGuard, currentValue, value)) return;
 
 		view.dispatch({
 			changes: {
@@ -289,7 +291,7 @@ export function CodeEditor({
 				insert: value,
 			},
 		});
-	}, [value]);
+	}, [value, valueSyncGuard]);
 
 	useEffect(() => {
 		const view = viewRef.current;
