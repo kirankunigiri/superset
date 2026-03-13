@@ -52,6 +52,7 @@ export function BranchesGroup({ projectId }: BranchesGroupProps) {
 		data: searchData,
 		isLoading: isSearchLoading,
 		isFetching,
+		isError: isSearchError,
 	} = electronTrpc.projects.searchBranches.useQuery(
 		{
 			projectId: projectId ?? "",
@@ -62,8 +63,16 @@ export function BranchesGroup({ projectId }: BranchesGroupProps) {
 		{
 			enabled: !!projectId && filterMode === "all",
 			placeholderData: (previous) => previous,
+			retry: false,
 		},
 	);
+
+	// Fallback: use getBranchesLocal when searchBranches fails
+	const { data: localBranchData, isLoading: isLocalLoading } =
+		electronTrpc.projects.getBranchesLocal.useQuery(
+			{ projectId: projectId ?? "" },
+			{ enabled: !!projectId && isSearchError },
+		);
 
 	// Background: fetch from remote to refresh local refs, then invalidate search cache
 	const utils = electronTrpc.useUtils();
@@ -76,6 +85,30 @@ export function BranchesGroup({ projectId }: BranchesGroupProps) {
 		setPrevRemoteData(remoteBranchData);
 		void utils.projects.searchBranches.invalidate();
 	}
+
+	// Combine: prefer searchBranches, fall back to getBranchesLocal with client-side search
+	const effectiveData = useMemo(() => {
+		if (searchData && !isSearchError) return searchData;
+		if (!localBranchData) return undefined;
+		const query = debouncedQuery.trim().toLowerCase();
+		const filtered = query
+			? localBranchData.branches.filter((b) =>
+					b.name.toLowerCase().includes(query),
+				)
+			: localBranchData.branches;
+		return {
+			branches: filtered.slice(0, displayLimit),
+			defaultBranch: localBranchData.defaultBranch,
+			totalCount: filtered.length,
+			hasMore: filtered.length > displayLimit,
+		};
+	}, [
+		searchData,
+		isSearchError,
+		localBranchData,
+		debouncedQuery,
+		displayLimit,
+	]);
 
 	const { data: allWorkspaces = [] } =
 		electronTrpc.workspaces.getAll.useQuery();
@@ -127,8 +160,8 @@ export function BranchesGroup({ projectId }: BranchesGroupProps) {
 
 	// For "all" mode, use server-side searched data
 	const serverBranchRows = useMemo(() => {
-		if (!searchData) return [];
-		return searchData.branches.map((branch) => {
+		if (!effectiveData) return [];
+		return effectiveData.branches.map((branch) => {
 			const action = resolveBranchAction({
 				branchName: branch.name,
 				workspaceByBranch,
@@ -138,7 +171,7 @@ export function BranchesGroup({ projectId }: BranchesGroupProps) {
 			return { branch, action };
 		});
 	}, [
-		searchData,
+		effectiveData,
 		workspaceByBranch,
 		trackedWorktreeByBranch,
 		externalWorktreeByBranch,
@@ -148,7 +181,7 @@ export function BranchesGroup({ projectId }: BranchesGroupProps) {
 	const worktreeBranchRows = useMemo(() => {
 		return externalWorktrees
 			.map((worktree) => {
-				const branch = searchData?.branches.find(
+				const branch = effectiveData?.branches.find(
 					(b) => b.name === worktree.branch,
 				) ?? {
 					name: worktree.branch,
@@ -165,7 +198,7 @@ export function BranchesGroup({ projectId }: BranchesGroupProps) {
 				return { branch, action };
 			})
 			.sort((a, b) => {
-				const defaultBranch = searchData?.defaultBranch ?? "main";
+				const defaultBranch = effectiveData?.defaultBranch ?? "main";
 				if (a.branch.name === defaultBranch) return -1;
 				if (b.branch.name === defaultBranch) return 1;
 				if (a.branch.isLocal !== b.branch.isLocal) {
@@ -175,7 +208,7 @@ export function BranchesGroup({ projectId }: BranchesGroupProps) {
 			});
 	}, [
 		externalWorktrees,
-		searchData,
+		effectiveData,
 		workspaceByBranch,
 		trackedWorktreeByBranch,
 		externalWorktreeByBranch,
@@ -302,7 +335,10 @@ export function BranchesGroup({ projectId }: BranchesGroupProps) {
 		);
 	}
 
-	if (isSearchLoading && filterMode === "all") {
+	if (
+		(isSearchLoading || (isSearchError && isLocalLoading)) &&
+		filterMode === "all"
+	) {
 		return (
 			<CommandGroup>
 				<CommandEmpty>Loading branches...</CommandEmpty>
@@ -317,7 +353,7 @@ export function BranchesGroup({ projectId }: BranchesGroupProps) {
 					{(["all", "worktrees"] as const).map((value) => {
 						const count =
 							value === "all"
-								? (searchData?.totalCount ?? 0)
+								? (effectiveData?.totalCount ?? 0)
 								: worktreeBranchRows.length;
 						return (
 							<button
@@ -421,14 +457,14 @@ export function BranchesGroup({ projectId }: BranchesGroupProps) {
 						</CommandItem>
 					);
 				})}
-				{filterMode === "all" && searchData?.hasMore && (
+				{filterMode === "all" && effectiveData?.hasMore && (
 					<CommandItem
 						onSelect={() => setDisplayLimit((prev) => prev + PAGE_SIZE)}
 						className="justify-center text-muted-foreground"
 					>
 						{isFetching
 							? "Loading..."
-							: `Show more branches (${searchData.totalCount - displayLimit} remaining)`}
+							: `Show more branches (${effectiveData.totalCount - displayLimit} remaining)`}
 					</CommandItem>
 				)}
 			</CommandGroup>
