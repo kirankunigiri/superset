@@ -2,6 +2,7 @@ import { useLiveQuery } from "@tanstack/react-db";
 import { useCallback, useMemo } from "react";
 import { useCollections } from "renderer/routes/_authenticated/providers/CollectionsProvider";
 import { useV2ProjectLocalMetaStore } from "renderer/stores/v2-project-local-meta";
+import { useV2WorkspaceLocalMetaStore } from "renderer/stores/v2-workspace-local-meta";
 import type { V2SidebarProject, V2SidebarWorkspace } from "../../types";
 
 const DEFAULT_META = { isCollapsed: false, tabOrder: 0 };
@@ -10,6 +11,9 @@ export function useV2SidebarData() {
 	const collections = useCollections();
 	const { toggleProjectCollapsed, projects: projectMetas } =
 		useV2ProjectLocalMetaStore();
+	const workspaceSortVersion = useV2WorkspaceLocalMetaStore(
+		(s) => s.sortVersion,
+	);
 
 	const { data: projects = [] } = useLiveQuery(
 		(q) => q.from({ v2Projects: collections.v2Projects }),
@@ -31,6 +35,8 @@ export function useV2SidebarData() {
 	);
 
 	const groups = useMemo<V2SidebarProject[]>(() => {
+		// workspaceSortVersion triggers re-sort when workspace order changes via DnD
+		void workspaceSortVersion;
 		const repoOwnerMap = new Map<string, string>();
 		for (const repo of githubRepos) {
 			repoOwnerMap.set(repo.id, repo.owner);
@@ -73,12 +79,20 @@ export function useV2SidebarData() {
 					createdAt: project.createdAt,
 					updatedAt: project.updatedAt,
 					isCollapsed: meta.isCollapsed,
-					workspaces: (workspacesByProject.get(project.id) ?? []).sort((a, b) =>
-						a.name.localeCompare(b.name),
+					workspaces: (workspacesByProject.get(project.id) ?? []).sort(
+						(a, b) => {
+							const getMeta =
+								useV2WorkspaceLocalMetaStore.getState().getWorkspaceMeta;
+							const orderA = getMeta(a.id).tabOrder;
+							const orderB = getMeta(b.id).tabOrder;
+							const orderDiff = orderA - orderB;
+							if (orderDiff !== 0) return orderDiff;
+							return a.name.localeCompare(b.name);
+						},
 					),
 				};
 			});
-	}, [projects, workspaces, projectMetas, githubRepos]);
+	}, [projects, workspaces, projectMetas, githubRepos, workspaceSortVersion]);
 
 	const totalWorkspaceCount = useMemo(
 		() =>

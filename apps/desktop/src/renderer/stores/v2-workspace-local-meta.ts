@@ -8,9 +8,11 @@ interface WorkspaceMeta {
 
 interface V2WorkspaceLocalMetaState {
 	workspaces: Record<string, WorkspaceMeta>;
+	sortVersion: number;
 
 	getWorkspaceMeta: (id: string) => WorkspaceMeta;
 	setWorkspaceTabOrder: (id: string, order: number) => void;
+	bumpSortVersion: () => void;
 }
 
 const DEFAULT_WORKSPACE_META: WorkspaceMeta = {
@@ -23,6 +25,7 @@ export const useV2WorkspaceLocalMetaStore = create<V2WorkspaceLocalMetaState>()(
 		persist(
 			(set, get) => ({
 				workspaces: {},
+				sortVersion: 0,
 
 				getWorkspaceMeta: (id) => {
 					return get().workspaces[id] ?? DEFAULT_WORKSPACE_META;
@@ -39,10 +42,15 @@ export const useV2WorkspaceLocalMetaStore = create<V2WorkspaceLocalMetaState>()(
 						};
 					});
 				},
+
+				bumpSortVersion: () => {
+					set((state) => ({ sortVersion: state.sortVersion + 1 }));
+				},
 			}),
 			{
 				name: "v2-workspace-local-meta",
 				version: 1,
+				partialize: (state) => ({ workspaces: state.workspaces }),
 			},
 		),
 		{ name: "V2WorkspaceLocalMetaStore" },

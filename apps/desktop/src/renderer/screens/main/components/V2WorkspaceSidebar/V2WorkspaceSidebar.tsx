@@ -17,6 +17,8 @@ export function V2WorkspaceSidebar({
 
 	useV2WorkspaceShortcuts(groups);
 
+	const projectIds = useMemo(() => groups.map((g) => g.id), [groups]);
+
 	const projectShortcutIndices = useMemo(
 		() =>
 			groups.reduce<{ indices: number[]; cumulative: number }>(
@@ -47,6 +49,8 @@ export function V2WorkspaceSidebar({
 							isSidebarCollapsed={isCollapsed}
 							workspaces={project.workspaces}
 							shortcutBaseIndex={projectShortcutIndices[index]}
+							index={index}
+							projectIds={projectIds}
 							onToggleCollapse={toggleProjectCollapsed}
 						/>
 					))
