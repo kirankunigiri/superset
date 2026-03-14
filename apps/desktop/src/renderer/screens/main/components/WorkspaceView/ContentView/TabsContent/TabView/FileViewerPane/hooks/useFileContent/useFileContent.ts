@@ -79,7 +79,13 @@ export function useFileContent({
 			encoding: "utf-8",
 			maxBytes: MAX_FILE_SIZE,
 		},
-		{ enabled: rawReadEnabled, retry: false },
+		{
+			enabled: rawReadEnabled,
+			retry: false,
+			// useWorkspaceFileEvents is the authoritative invalidation source for on-disk changes;
+			// window-focus refetches are redundant and introduce a race with in-flight user edits.
+			refetchOnWindowFocus: false,
+		},
 	);
 
 	const rawFileData = useMemo(() => {
