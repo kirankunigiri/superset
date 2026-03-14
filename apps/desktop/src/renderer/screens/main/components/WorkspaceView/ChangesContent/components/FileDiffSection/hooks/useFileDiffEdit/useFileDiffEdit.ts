@@ -3,7 +3,6 @@ import { electronTrpc } from "renderer/lib/electron-trpc";
 import type { ChangeCategory } from "shared/changes-types";
 import { isDiffEditable } from "shared/changes-types";
 
-/** Maximum file size for reading during conflict resolution (2 MiB) */
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
 
 interface UseFileDiffEditParams {
@@ -46,9 +45,7 @@ export function useFileDiffEdit({
 							currentContent,
 						};
 					}
-				} catch {
-					// File doesn't exist — proceed with save
-				}
+				} catch {}
 			}
 
 			const result = await writeFileMutation.mutateAsync({

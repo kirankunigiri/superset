@@ -6,13 +6,8 @@ import { getImageMimeType, isImageFile } from "shared/file-types";
 
 const BRANCH_QUERY_STALE_TIME_MS = 10_000;
 
-/** Maximum file size for reading (2 MiB) */
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
-
-/** Maximum image file size (10 MiB) */
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
-
-/** Characters to scan for binary detection */
 const BINARY_CHECK_SIZE = 8192;
 
 interface UseFileContentParams {

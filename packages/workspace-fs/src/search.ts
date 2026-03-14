@@ -632,9 +632,7 @@ async function searchContentWithScan({
 					fromIndex = matchIndex + lowerNeedle.length;
 				}
 			}
-		} catch {
-			// Skip unreadable files and continue searching.
-		}
+		} catch {}
 	}
 
 	return rankContentMatches(matches, query, safeLimit);

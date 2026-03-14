@@ -4,7 +4,6 @@ import { useTabsStore } from "renderer/stores/tabs/store";
 import type { ChangeCategory } from "shared/changes-types";
 import type { CodeEditorAdapter } from "../../../../../components";
 
-/** Maximum file size for reading during conflict resolution (2 MiB) */
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
 
 interface UseFileSaveParams {

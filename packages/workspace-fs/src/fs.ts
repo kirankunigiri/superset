@@ -494,9 +494,7 @@ export async function getMetadata({
 		if (stats.isSymbolicLink()) {
 			try {
 				symlinkTarget = await fs.readlink(targetPath);
-			} catch {
-				// Ignore readlink errors
-			}
+			} catch {}
 		}
 
 		return {
