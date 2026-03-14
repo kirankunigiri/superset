@@ -537,6 +537,12 @@ export async function writeFile({
 	const create = options?.create ?? true;
 	const overwrite = options?.overwrite ?? true;
 
+	if (!create && !overwrite) {
+		throw new Error(
+			"Invalid writeFile options: create and overwrite cannot both be false",
+		);
+	}
+
 	const execute = async (): Promise<FsWriteResult> => {
 		if (precondition?.ifMatch !== undefined) {
 			try {
@@ -607,6 +613,10 @@ export async function createDirectory({
 		await fs.mkdir(targetPath);
 	} catch (error) {
 		if (!isEexist(error)) {
+			throw error;
+		}
+		const stats = await fs.lstat(targetPath);
+		if (!stats.isDirectory()) {
 			throw error;
 		}
 	}

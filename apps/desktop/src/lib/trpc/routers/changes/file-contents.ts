@@ -71,11 +71,10 @@ export const createFileContentsRouter = () => {
 							input.absolutePath,
 						);
 
-				let content = await safeGitShow(git, `:0:${originalPath}`);
-				if (!content) {
-					content = await safeGitShow(git, `HEAD:${originalPath}`);
-				}
-				return { content };
+				const staged = await safeGitShow(git, `:0:${originalPath}`);
+				const content =
+					staged ?? (await safeGitShow(git, `HEAD:${originalPath}`));
+				return { content: content ?? "" };
 			}),
 	});
 };
@@ -108,7 +107,10 @@ async function getGitOnlyVersions(
 	}
 }
 
-async function safeGitShow(git: SimpleGit, spec: string): Promise<string> {
+async function safeGitShow(
+	git: SimpleGit,
+	spec: string,
+): Promise<string | null> {
 	try {
 		// Guard against memory spikes from large blobs in git history
 		try {
@@ -122,7 +124,7 @@ async function safeGitShow(git: SimpleGit, spec: string): Promise<string> {
 		const content = await git.show([spec]);
 		return content;
 	} catch {
-		return "";
+		return null;
 	}
 }
 
@@ -137,7 +139,7 @@ async function getAgainstBaseVersions(
 		safeGitShow(git, `HEAD:${filePath}`),
 	]);
 
-	return { original, modified };
+	return { original: original ?? "", modified: modified ?? "" };
 }
 
 async function getCommittedVersions(
@@ -151,7 +153,7 @@ async function getCommittedVersions(
 		safeGitShow(git, `${commitHash}:${filePath}`),
 	]);
 
-	return { original, modified };
+	return { original: original ?? "", modified: modified ?? "" };
 }
 
 async function getStagedVersions(
@@ -164,5 +166,5 @@ async function getStagedVersions(
 		safeGitShow(git, `:0:${filePath}`),
 	]);
 
-	return { original, modified };
+	return { original: original ?? "", modified: modified ?? "" };
 }

@@ -18,11 +18,10 @@ import {
 import { createFileKey, useScrollContext } from "../../context";
 import { LightDiffViewer } from "../LightDiffViewer";
 import { FileDiffHeader } from "./components/FileDiffHeader";
-
-const MAX_FILE_SIZE = 2 * 1024 * 1024;
-
 import { FILE_DIFF_SECTION_PLACEHOLDER_HEIGHT } from "./constants";
 import { useFileDiffEdit } from "./hooks/useFileDiffEdit";
+
+const MAX_FILE_SIZE = 2 * 1024 * 1024;
 
 interface FileDiffSectionProps {
 	file: ChangedFile;
@@ -293,12 +292,14 @@ export function FileDiffSection({
 
 	const diffData = useMemo(() => {
 		if (!isUnstaged) return gitDiffData;
-		if (gitOriginal && workingCopy) {
-			let modifiedContent: string;
-			if (workingCopy.exceededLimit) {
-				modifiedContent = `[File content truncated - exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB limit]`;
-			} else {
-				modifiedContent = workingCopy.content as string;
+		if (gitOriginal) {
+			let modifiedContent = "";
+			if (workingCopy) {
+				if (workingCopy.exceededLimit) {
+					modifiedContent = `[File content truncated - exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB limit]`;
+				} else {
+					modifiedContent = workingCopy.content as string;
+				}
 			}
 			return {
 				original: gitOriginal.content,

@@ -197,12 +197,14 @@ export function useFileContent({
 
 	const diffData = useMemo(() => {
 		if (isGitDiff) return gitDiffData;
-		if (isUnstagedDiff && gitOriginal && workingCopy) {
-			let modifiedContent: string;
-			if (workingCopy.exceededLimit) {
-				modifiedContent = `[File content truncated - exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB limit]`;
-			} else {
-				modifiedContent = workingCopy.content as string;
+		if (isUnstagedDiff && gitOriginal) {
+			let modifiedContent = "";
+			if (workingCopy) {
+				if (workingCopy.exceededLimit) {
+					modifiedContent = `[File content truncated - exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB limit]`;
+				} else {
+					modifiedContent = workingCopy.content as string;
+				}
 			}
 			return {
 				original: gitOriginal.content,
