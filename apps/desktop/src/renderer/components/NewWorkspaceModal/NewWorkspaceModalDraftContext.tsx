@@ -27,6 +27,8 @@ export interface NewWorkspaceModalDraft {
 	runSetupScript: boolean;
 	workspaceName: string;
 	workspaceNameEdited: boolean;
+	branchName: string;
+	branchNameEdited: boolean;
 	linkedIssues: LinkedIssue[];
 	linkedPR: LinkedPR | null;
 }
@@ -42,6 +44,8 @@ const initialDraft: NewWorkspaceModalDraft = {
 	runSetupScript: true,
 	workspaceName: "",
 	workspaceNameEdited: false,
+	branchName: "",
+	branchNameEdited: false,
 	linkedIssues: [],
 	linkedPR: null,
 };
@@ -141,6 +145,8 @@ export function NewWorkspaceModalDraftProvider({
 				runSetupScript: state.runSetupScript,
 				workspaceName: state.workspaceName,
 				workspaceNameEdited: state.workspaceNameEdited,
+				branchName: state.branchName,
+				branchNameEdited: state.branchNameEdited,
 				linkedIssues: state.linkedIssues,
 				linkedPR: state.linkedPR,
 			},
