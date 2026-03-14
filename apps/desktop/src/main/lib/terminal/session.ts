@@ -9,13 +9,13 @@ import {
 	containsClearScrollbackSequence,
 	extractContentAfterClear,
 } from "../terminal-escape-filter";
+import { DEFAULT_TERMINAL_SCROLLBACK } from "shared/constants";
 import { buildTerminalEnv, FALLBACK_SHELL, getDefaultShell } from "./env";
 import { PtyWriteQueue } from "./pty-write-queue";
 import type { InternalCreateSessionParams, TerminalSession } from "./types";
 
 const DEFAULT_COLS = 80;
 const DEFAULT_ROWS = 24;
-const DEFAULT_SCROLLBACK = 2000;
 const DEBUG_TERMINAL = process.env.SUPERSET_TERMINAL_DEBUG === "1";
 
 export function createHeadlessTerminal(params: {
@@ -23,7 +23,7 @@ export function createHeadlessTerminal(params: {
 	rows: number;
 	scrollback?: number;
 }): { headless: HeadlessTerminal; serializer: SerializeAddon } {
-	const { cols, rows, scrollback = DEFAULT_SCROLLBACK } = params;
+	const { cols, rows, scrollback = DEFAULT_TERMINAL_SCROLLBACK } = params;
 
 	const headless = new HeadlessTerminal({
 		cols,

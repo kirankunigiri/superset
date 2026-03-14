@@ -23,6 +23,7 @@ import type {
 	TerminalExitEvent,
 	TerminalSnapshot,
 } from "../lib/terminal-host/types";
+import { DEFAULT_TERMINAL_SCROLLBACK } from "shared/constants";
 import { treeKillAsync } from "../lib/tree-kill";
 import {
 	createFrameHeader,
@@ -152,7 +153,7 @@ export class Session {
 		this.emulator = new HeadlessEmulator({
 			cols: options.cols,
 			rows: options.rows,
-			scrollback: options.scrollbackLines ?? 2000,
+			scrollback: options.scrollbackLines ?? DEFAULT_TERMINAL_SCROLLBACK,
 		});
 
 		// Set initial CWD
