@@ -26,8 +26,8 @@ Refactor `packages/workspace-fs` and desktop filesystem router to match `plans/w
 - [x] Milestone 4: Changes router — git only
 - [x] Milestone 5: Staging router — remove fs ops
 - [x] Milestone 6: Terminal — writeTaskFile to client
-- [ ] Milestone 7: Client orchestration
-- [ ] Final: Remove dead code, typecheck + lint + test
+- [x] Milestone 7: Client orchestration
+- [x] Final: Remove dead code, typecheck + lint + test
 
 
 ## Milestone 1: workspace-fs types + service interface
@@ -179,4 +179,6 @@ Manual: diff viewer, save with revision-based conflict detection, discard untrac
 
 ## Outcomes & Retrospective
 
-(To be filled.)
+All milestones complete. The workspace-fs package now exposes a pure path-based service interface (no workspaceId). Desktop adapter handles workspace scoping. Renderer hooks (useFileContent, useFileSave, useFileDiffEdit) and components (FileViewerPane, FileDiffSection, ChangesView, RightSidebar) all route through `trpc.filesystem.*` for reads/writes and `trpc.changes.getGitFileContents`/`getGitOriginalContent` for git-only diffs. Legacy changes procedures (getFileContents, saveFile, readWorkingFile, readWorkingFileImage) removed. Legacy filesystem procedures (exists, stat) removed. Legacy filesystem procedures still actively used by file tree UI (readDirectory, subscribe, searchFiles, searchFilesMulti, searchKeyword, createFile, createDirectory, rename, delete, move, copy) retained — these should be migrated in a follow-up.
+
+Validation: typecheck passes, lint clean, no `node:fs` in changes router or terminal router. 4 pre-existing test failures unrelated to this migration.

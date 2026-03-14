@@ -693,45 +693,5 @@ export const createFilesystemRouter = () => {
 
 				return { copied, errors };
 			}),
-
-		exists: publicProcedure
-			.input(
-				z.object({
-					workspaceId: z.string(),
-					absolutePath: z.string(),
-				}),
-			)
-			.query(async ({ input }) => {
-				const service = getServiceForWorkspace(input.workspaceId);
-				const metadata = await service.getMetadata({
-					absolutePath: input.absolutePath,
-				});
-				if (!metadata) {
-					return {
-						exists: false,
-						isDirectory: false,
-						isFile: false,
-					};
-				}
-				return {
-					exists: true,
-					isDirectory: metadata.kind === "directory",
-					isFile: metadata.kind === "file",
-				};
-			}),
-
-		stat: publicProcedure
-			.input(
-				z.object({
-					workspaceId: z.string(),
-					absolutePath: z.string(),
-				}),
-			)
-			.query(async ({ input }) => {
-				const service = getServiceForWorkspace(input.workspaceId);
-				return await service.getMetadata({
-					absolutePath: input.absolutePath,
-				});
-			}),
 	});
 };

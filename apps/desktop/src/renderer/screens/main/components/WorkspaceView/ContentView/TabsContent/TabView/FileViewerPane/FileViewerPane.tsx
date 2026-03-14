@@ -87,6 +87,7 @@ export function FileViewerPane({
 	const originalContentRef = useRef<string>("");
 	const draftContentRef = useRef<string | null>(null);
 	const originalDiffContentRef = useRef<string>("");
+	const revisionRef = useRef<string>("");
 	const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
 	const [isSavingAndSwitching, setIsSavingAndSwitching] = useState(false);
 	const [saveConflict, setSaveConflict] = useState<{
@@ -115,7 +116,7 @@ export function FileViewerPane({
 	});
 
 	const { handleSaveRaw, isSaving } = useFileSave({
-		worktreePath,
+		workspaceId,
 		filePath,
 		paneId,
 		diffCategory,
@@ -123,6 +124,7 @@ export function FileViewerPane({
 		originalContentRef,
 		originalDiffContentRef,
 		draftContentRef,
+		revisionRef,
 		setIsDirty,
 	});
 
@@ -134,6 +136,7 @@ export function FileViewerPane({
 		diffData,
 		isLoadingDiff,
 	} = useFileContent({
+		workspaceId,
 		worktreePath,
 		filePath,
 		viewMode,
@@ -143,12 +146,12 @@ export function FileViewerPane({
 		isDirty,
 		originalContentRef,
 		originalDiffContentRef,
+		revisionRef,
 	});
 	const absoluteFilePath = useMemo(
 		() => toAbsoluteWorkspacePath(worktreePath, filePath),
 		[worktreePath, filePath],
 	);
-	const isImage = useMemo(() => isImageFile(filePath), [filePath]);
 	const hasExternalDiskChange =
 		isDirty &&
 		viewMode === "raw" &&
@@ -157,30 +160,31 @@ export function FileViewerPane({
 			(rawFileData?.ok === false && rawFileData.reason === "not-found"));
 
 	const invalidateCurrentFile = useCallback(() => {
-		if (!worktreePath || !filePath) {
+		if (!filePath) {
 			return;
 		}
 
 		const invalidations: Promise<unknown>[] = [];
 		if (viewMode === "diff") {
 			invalidations.push(
-				trpcUtils.changes.getFileContents.invalidate({
+				trpcUtils.changes.getGitFileContents.invalidate({
+					worktreePath,
+					absolutePath: absoluteFilePath,
+					oldAbsolutePath: oldPath,
+				}),
+				trpcUtils.changes.getGitOriginalContent.invalidate({
 					worktreePath,
 					absolutePath: absoluteFilePath,
 					oldAbsolutePath: oldPath,
 				}),
 			);
-		} else if (viewMode === "rendered" && isImage) {
+		}
+
+		// Invalidate filesystem.readFile for this path (covers raw, image, and working copy reads)
+		if (workspaceId) {
 			invalidations.push(
-				trpcUtils.changes.readWorkingFileImage.invalidate({
-					worktreePath,
-					absolutePath: absoluteFilePath,
-				}),
-			);
-		} else {
-			invalidations.push(
-				trpcUtils.changes.readWorkingFile.invalidate({
-					worktreePath,
+				trpcUtils.filesystem.readFile.invalidate({
+					workspaceId,
 					absolutePath: absoluteFilePath,
 				}),
 			);
@@ -188,7 +192,6 @@ export function FileViewerPane({
 
 		Promise.all(invalidations).catch((error) => {
 			console.error("[FileViewerPane] Failed to invalidate file queries:", {
-				worktreePath,
 				absolutePath: absoluteFilePath,
 				error,
 			});
@@ -196,10 +199,10 @@ export function FileViewerPane({
 	}, [
 		absoluteFilePath,
 		filePath,
-		isImage,
 		oldPath,
 		trpcUtils,
 		viewMode,
+		workspaceId,
 		worktreePath,
 	]);
 
