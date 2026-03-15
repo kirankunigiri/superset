@@ -11,7 +11,11 @@ import {
 import { acknowledgedStatus } from "shared/tabs-types";
 import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
-import { movePaneToNewTab, movePaneToTab } from "./actions/move-pane";
+import {
+	mergeTabIntoTab,
+	movePaneToNewTab,
+	movePaneToTab,
+} from "./actions/move-pane";
 import type {
 	AddFileViewerPaneOptions,
 	AddTabWithMultiplePanesOptions,
@@ -1421,6 +1425,33 @@ export const useTabsStore = create<TabsStore>()(
 
 					set(moveResult.result);
 					return moveResult.newTabId;
+				},
+
+				mergeTabIntoTab: (
+					sourceTabId,
+					targetTabId,
+					destinationPath,
+					position,
+				) => {
+					const state = get();
+					const result = mergeTabIntoTab(
+						state,
+						sourceTabId,
+						targetTabId,
+						destinationPath,
+						position,
+					);
+					if (!result) return;
+
+					// Re-derive tab name for the target tab
+					result.tabs = result.tabs.map((t) => {
+						if (t.id === targetTabId) {
+							return { ...t, name: deriveTabName(result.panes, t.id) };
+						}
+						return t;
+					});
+
+					set(result);
 				},
 
 				// Browser operations
