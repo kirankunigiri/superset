@@ -1,5 +1,5 @@
 import { toast } from "@superset/ui/sonner";
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { buildTerminalCommand } from "renderer/lib/terminal/launch-command";
 import { electronTrpcClient } from "renderer/lib/trpc-client";
 import { useTabsStore } from "renderer/stores/tabs/store";
@@ -15,6 +15,7 @@ export function useWorkspaceRunCommand({
 	worktreePath,
 }: UseWorkspaceRunCommandOptions) {
 	const isStartingRef = useRef(false);
+	const [isPending, setIsPending] = useState(false);
 
 	const addTab = useTabsStore((s) => s.addTab);
 	const setPaneName = useTabsStore((s) => s.setPaneName);
@@ -41,6 +42,7 @@ export function useWorkspaceRunCommand({
 
 		// STOP: if currently running, kill it
 		if (isRunning && runPane) {
+			setIsPending(true);
 			try {
 				await electronTrpcClient.terminal.kill.mutate({ paneId: runPane.id });
 				setPaneWorkspaceRun(runPane.id, {
@@ -51,6 +53,8 @@ export function useWorkspaceRunCommand({
 				toast.error("Failed to stop workspace run command", {
 					description: error instanceof Error ? error.message : "Unknown error",
 				});
+			} finally {
+				setIsPending(false);
 			}
 			return;
 		}
@@ -71,6 +75,7 @@ export function useWorkspaceRunCommand({
 		}
 
 		isStartingRef.current = true;
+		setIsPending(true);
 		try {
 			const initialCwd = worktreePath?.trim() ? worktreePath : undefined;
 
@@ -140,6 +145,7 @@ export function useWorkspaceRunCommand({
 			setFocusedPane(tabId, paneId);
 		} finally {
 			isStartingRef.current = false;
+			setIsPending(false);
 		}
 	}, [
 		addTab,
@@ -156,6 +162,7 @@ export function useWorkspaceRunCommand({
 
 	return {
 		isRunning,
+		isPending,
 		toggleWorkspaceRun,
 	};
 }

@@ -3,6 +3,7 @@ import { cn } from "@superset/ui/utils";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { HiArrowTopRightOnSquare, HiDocumentArrowUp } from "react-icons/hi2";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { invalidateProjectScriptQueries } from "renderer/lib/project-scripts";
 import { EXTERNAL_LINKS } from "shared/constants";
 
 interface ScriptsEditorProps {
@@ -258,11 +259,7 @@ export function ScriptsEditor({ projectId, className }: ScriptsEditorProps) {
 
 				await updateConfigMutation.mutateAsync(payload);
 				lastSavedPayloadRef.current = serializedPayload;
-				await Promise.all([
-					utils.config.getConfigContent.invalidate({ projectId }),
-					utils.config.shouldShowSetupCard.invalidate({ projectId }),
-					utils.workspaces.getResolvedRunCommands.invalidate(),
-				]);
+				await invalidateProjectScriptQueries(utils, projectId);
 
 				const currentPayload = buildPayload(latestContentRef.current);
 				setHasChanges(
@@ -272,15 +269,7 @@ export function ScriptsEditor({ projectId, className }: ScriptsEditorProps) {
 		} finally {
 			saveInFlightRef.current = false;
 		}
-	}, [
-		buildPayload,
-		updateConfigMutation,
-		projectId,
-		serializePayload,
-		utils.config.getConfigContent,
-		utils.config.shouldShowSetupCard,
-		utils.workspaces.getResolvedRunCommands,
-	]);
+	}, [buildPayload, updateConfigMutation, projectId, serializePayload, utils]);
 
 	if (isLoading) {
 		return (
