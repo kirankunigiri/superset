@@ -113,6 +113,20 @@ function readLocalConfigFromPath(basePath: string): LocalSetupConfig | null {
 	);
 }
 
+function mergeBaseConfigs(
+	base: SetupConfig | null,
+	override: SetupConfig | null,
+): SetupConfig | null {
+	if (!base) return override;
+	if (!override) return base;
+
+	return {
+		setup: override.setup ?? base.setup,
+		teardown: override.teardown ?? base.teardown,
+		run: override.run ?? base.run,
+	};
+}
+
 /**
  * Merge a base config with a local config overlay.
  *
@@ -144,12 +158,14 @@ export function mergeConfigs(
 }
 
 /**
- * Resolves setup/teardown config with a three-tier priority:
+ * Resolves setup/teardown/run config with a three-tier priority:
  *   1. User override:  ~/.superset/projects/<projectId>/config.json
  *   2. Worktree:       <worktreePath>/.superset/config.json
  *   3. Main repo:      <mainRepoPath>/.superset/config.json
  *
- * First config found wins entirely (no merging between levels).
+ * Higher-priority configs override only the keys they explicitly define.
+ * Missing keys inherit from lower-priority sources, so stale copied worktree
+ * configs do not mask newly added project-level commands like `run`.
  *
  * After resolving the base config, a local overlay is applied if
  * `.superset/config.local.json` exists in the workspace (worktree or main repo).
@@ -164,7 +180,23 @@ export function loadSetupConfig({
 	worktreePath?: string;
 	projectId?: string;
 }): SetupConfig | null {
-	let base: SetupConfig | null = null;
+	let base = readConfigFromPath(mainRepoPath);
+
+	if (base) {
+		console.log(
+			`[setup] Using main repo config from ${join(mainRepoPath, PROJECT_SUPERSET_DIR_NAME, CONFIG_FILE_NAME)}`,
+		);
+	}
+
+	if (worktreePath) {
+		const config = readConfigFromPath(worktreePath);
+		if (config) {
+			console.log(
+				`[setup] Using worktree config from ${join(worktreePath, PROJECT_SUPERSET_DIR_NAME, CONFIG_FILE_NAME)}`,
+			);
+			base = mergeBaseConfigs(base, config);
+		}
+	}
 
 	if (projectId && !projectId.includes("/") && !projectId.includes("\\")) {
 		const userConfigPath = join(
@@ -177,27 +209,7 @@ export function loadSetupConfig({
 		const config = readConfigFile(userConfigPath);
 		if (config) {
 			console.log(`[setup] Using user override config from ${userConfigPath}`);
-			base = config;
-		}
-	}
-
-	if (!base && worktreePath) {
-		const config = readConfigFromPath(worktreePath);
-		if (config) {
-			console.log(
-				`[setup] Using worktree config from ${join(worktreePath, PROJECT_SUPERSET_DIR_NAME, CONFIG_FILE_NAME)}`,
-			);
-			base = config;
-		}
-	}
-
-	if (!base) {
-		const config = readConfigFromPath(mainRepoPath);
-		if (config) {
-			console.log(
-				`[setup] Using main repo config from ${join(mainRepoPath, PROJECT_SUPERSET_DIR_NAME, CONFIG_FILE_NAME)}`,
-			);
-			base = config;
+			base = mergeBaseConfigs(base, config);
 		}
 	}
 

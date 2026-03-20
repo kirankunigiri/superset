@@ -93,6 +93,33 @@ describe("loadSetupConfig", () => {
 		expect(config).toEqual(worktreeConfig);
 	});
 
+	test("worktree config inherits missing keys from main repo config", () => {
+		writeFileSync(
+			join(MAIN_REPO, ".superset", "config.json"),
+			JSON.stringify({
+				setup: ["./.superset/setup.sh"],
+				run: ["bun dev"],
+			}),
+		);
+
+		mkdirSync(join(WORKTREE, ".superset"), { recursive: true });
+		writeFileSync(
+			join(WORKTREE, ".superset", "config.json"),
+			JSON.stringify({
+				setup: ["scripts/setup-worktree.sh"],
+			}),
+		);
+
+		const config = loadSetupConfig({
+			mainRepoPath: MAIN_REPO,
+			worktreePath: WORKTREE,
+		});
+		expect(config).toEqual({
+			setup: ["scripts/setup-worktree.sh"],
+			run: ["bun dev"],
+		});
+	});
+
 	test("falls back to main repo when worktree has no config", () => {
 		const mainConfig = { setup: ["npm install"] };
 
@@ -130,6 +157,33 @@ describe("loadSetupConfig", () => {
 			projectId: PROJECT_ID,
 		});
 		expect(config).toEqual(userConfig);
+	});
+
+	test("user override inherits missing keys from lower-priority config", () => {
+		writeFileSync(
+			join(MAIN_REPO, ".superset", "config.json"),
+			JSON.stringify({
+				setup: ["npm install"],
+				run: ["bun dev"],
+			}),
+		);
+
+		mkdirSync(USER_CONFIG_DIR, { recursive: true });
+		writeFileSync(
+			join(USER_CONFIG_DIR, "config.json"),
+			JSON.stringify({
+				setup: ["custom-setup.sh"],
+			}),
+		);
+
+		const config = loadSetupConfig({
+			mainRepoPath: MAIN_REPO,
+			projectId: PROJECT_ID,
+		});
+		expect(config).toEqual({
+			setup: ["custom-setup.sh"],
+			run: ["bun dev"],
+		});
 	});
 
 	test("user override takes priority over worktree config", () => {
