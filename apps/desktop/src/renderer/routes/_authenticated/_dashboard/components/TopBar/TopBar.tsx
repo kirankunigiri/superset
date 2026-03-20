@@ -63,6 +63,7 @@ export function TopBar() {
 				)}
 				{workspaceId && (
 					<WorkspaceRunButton
+						projectId={workspace?.projectId ?? workspace?.project?.id}
 						workspaceId={workspaceId}
 						worktreePath={workspace?.worktreePath}
 					/>

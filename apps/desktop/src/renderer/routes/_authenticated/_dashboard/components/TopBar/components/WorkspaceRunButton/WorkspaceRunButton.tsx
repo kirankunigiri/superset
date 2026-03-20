@@ -1,29 +1,73 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { cn } from "@superset/ui/utils";
+import { useNavigate } from "@tanstack/react-router";
 import { memo, useCallback } from "react";
-import { HiMiniPlay, HiMiniStop } from "react-icons/hi2";
+import { HiMiniCog6Tooth, HiMiniPlay, HiMiniStop } from "react-icons/hi2";
+import { HotkeyTooltipContent } from "renderer/components/HotkeyTooltipContent";
+import { electronTrpc } from "renderer/lib/electron-trpc";
 import { useWorkspaceRunCommand } from "renderer/routes/_authenticated/_dashboard/workspace/$workspaceId/hooks/useWorkspaceRunCommand";
-import { useHotkeyText } from "renderer/stores/hotkeys";
+import { useSetSettingsSearchQuery } from "renderer/stores/settings-state";
 
 interface WorkspaceRunButtonProps {
+	projectId?: string | null;
 	workspaceId: string;
 	worktreePath?: string | null;
 }
 
 export const WorkspaceRunButton = memo(function WorkspaceRunButton({
+	projectId,
 	workspaceId,
 	worktreePath,
 }: WorkspaceRunButtonProps) {
+	const navigate = useNavigate();
+	const setSettingsSearchQuery = useSetSettingsSearchQuery();
 	const { isRunning, isPending, toggleWorkspaceRun } = useWorkspaceRunCommand({
 		workspaceId,
 		worktreePath,
 	});
-	const runShortcut = useHotkeyText("RUN_WORKSPACE_COMMAND");
-	const showRunShortcut = runShortcut !== "Unassigned";
+	const { data: runConfig } =
+		electronTrpc.workspaces.getResolvedRunCommands.useQuery(
+			{ workspaceId },
+			{ enabled: !!workspaceId },
+		);
+	const hasRunCommand = (runConfig?.commands ?? []).some(
+		(command) => command.trim().length > 0,
+	);
 
 	const handleClick = useCallback(() => {
+		if (!hasRunCommand && projectId) {
+			setSettingsSearchQuery("scripts");
+			void navigate({
+				to: "/settings/project/$projectId/general",
+				params: { projectId },
+			});
+			return;
+		}
+
 		void toggleWorkspaceRun();
-	}, [toggleWorkspaceRun]);
+	}, [
+		hasRunCommand,
+		navigate,
+		projectId,
+		setSettingsSearchQuery,
+		toggleWorkspaceRun,
+	]);
+
+	const buttonLabel = isRunning ? "Stop" : hasRunCommand ? "Run" : "Set Run";
+	const buttonAriaLabel = isRunning
+		? "Stop workspace run command"
+		: hasRunCommand
+			? "Run workspace command"
+			: "Configure workspace run command";
+	const tooltipLabel = isPending
+		? isRunning
+			? "Stopping workspace run command"
+			: "Starting workspace run command"
+		: isRunning
+			? "Stop workspace run command"
+			: hasRunCommand
+				? "Run workspace command"
+				: "Configure workspace run command";
 
 	return (
 		<Tooltip>
@@ -32,9 +76,7 @@ export const WorkspaceRunButton = memo(function WorkspaceRunButton({
 					type="button"
 					onClick={handleClick}
 					disabled={isPending}
-					aria-label={
-						isRunning ? "Stop workspace run command" : "Run workspace command"
-					}
+					aria-label={buttonAriaLabel}
 					className={cn(
 						"no-drag flex items-center gap-1.5 h-6 px-2 rounded border border-border/60 bg-secondary/50 text-xs font-medium",
 						"transition-all duration-150 ease-out",
@@ -44,28 +86,26 @@ export const WorkspaceRunButton = memo(function WorkspaceRunButton({
 						isPending && "opacity-50 pointer-events-none",
 						isRunning
 							? "text-emerald-300 border-emerald-500/25 bg-emerald-500/10"
-							: "text-foreground",
+							: hasRunCommand
+								? "text-foreground"
+								: "text-amber-200 border-amber-500/25 bg-amber-500/10",
 					)}
 				>
 					{isRunning ? (
 						<HiMiniStop className="size-3.5 shrink-0" />
-					) : (
+					) : hasRunCommand ? (
 						<HiMiniPlay className="size-3.5 shrink-0" />
+					) : (
+						<HiMiniCog6Tooth className="size-3.5 shrink-0" />
 					)}
-					<span>{isRunning ? "Stop" : "Run"}</span>
+					<span>{buttonLabel}</span>
 				</button>
 			</TooltipTrigger>
 			<TooltipContent side="bottom" sideOffset={6}>
-				<div className="flex items-center gap-1.5">
-					<span>
-						{isRunning ? "Stop workspace run command" : "Run workspace command"}
-					</span>
-					{showRunShortcut && (
-						<kbd className="px-1 py-0.5 text-[10px] font-mono bg-foreground/10 text-foreground/70 rounded">
-							{runShortcut}
-						</kbd>
-					)}
-				</div>
+				<HotkeyTooltipContent
+					label={tooltipLabel}
+					hotkeyId="RUN_WORKSPACE_COMMAND"
+				/>
 			</TooltipContent>
 		</Tooltip>
 	);
