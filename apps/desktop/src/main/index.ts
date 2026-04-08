@@ -1,6 +1,7 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { settings } from "@superset/local-db";
+import { eq } from "drizzle-orm";
 import {
 	app,
 	BrowserWindow,
@@ -32,6 +33,7 @@ import { getHostServiceManager } from "./lib/host-service-manager";
 import { localDb } from "./lib/local-db";
 import { ensureProjectIconsDir, getProjectIconPath } from "./lib/project-icons";
 import { initSentry } from "./lib/sentry";
+import { sshReconnectionManager } from "./lib/ssh/reconnection";
 import {
 	prewarmTerminalRuntime,
 	reconcileDaemonSessions,
@@ -357,6 +359,12 @@ if (!gotTheLock) {
 		await loadWebviewBrowserExtension();
 
 		// Must happen before renderer restore runs
+		await sshReconnectionManager.reconcileOnStartup().catch((error) => {
+			console.warn(
+				"[main] SSH reconciliation failed:",
+				error instanceof Error ? error.message : String(error),
+			);
+		});
 		await reconcileDaemonSessions();
 		prewarmTerminalRuntime();
 
