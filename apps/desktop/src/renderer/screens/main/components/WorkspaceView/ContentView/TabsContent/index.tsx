@@ -4,6 +4,7 @@ import { useParams } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef } from "react";
 import { useTabsStore } from "renderer/stores/tabs/store";
 import { resolveActiveTabIdForWorkspace } from "renderer/stores/tabs/utils";
+import { syncAllPositions } from "renderer/stores/webview-overlay";
 import { EmptyTabView } from "./EmptyTabView";
 import { TabView } from "./TabView";
 import { getTabsToRender } from "./utils/getTabsToRender";
@@ -81,7 +82,13 @@ export function TabsContent({
 			tabId: nextTabId,
 		};
 
-		if (!didActivationChange || !nextTabId) {
+		if (!didActivationChange) {
+			return;
+		}
+
+		syncAllPositions();
+
+		if (!nextTabId) {
 			return;
 		}
 

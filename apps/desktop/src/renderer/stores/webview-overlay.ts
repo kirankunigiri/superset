@@ -31,7 +31,6 @@ interface WebviewEntry {
 const webviews = new Map<string, WebviewEntry>();
 const slots = new Map<string, HTMLElement>();
 let overlayContainer: HTMLDivElement | null = null;
-const slotListeners = new Set<() => void>();
 
 // ---------------------------------------------------------------------------
 // Overlay container (called by WebviewOverlay component)
@@ -116,7 +115,6 @@ export function destroyWebview(paneId: string): void {
 	webviews.delete(paneId);
 	electronTrpcClient.browser.unregister.mutate({ paneId }).catch(() => {});
 }
-
 
 // ---------------------------------------------------------------------------
 // Event handlers (permanent — not tied to React lifecycle)
@@ -248,7 +246,6 @@ export function registerSlot(paneId: string, element: HTMLElement): void {
 	slots.set(paneId, element);
 	// syncPosition checks visibility and sets display accordingly
 	syncPosition(paneId);
-	notifySlotListeners();
 }
 
 export function unregisterSlot(paneId: string): void {
@@ -257,11 +254,6 @@ export function unregisterSlot(paneId: string): void {
 	if (entry) {
 		entry.wrapper.style.display = "none";
 	}
-	notifySlotListeners();
-}
-
-function notifySlotListeners(): void {
-	for (const listener of slotListeners) listener();
 }
 
 // ---------------------------------------------------------------------------
@@ -280,6 +272,23 @@ export function syncPosition(paneId: string): void {
 	if (!isVisible) {
 		entry.wrapper.style.display = "none";
 		return;
+	}
+
+	// Hide the webview when BrowserPane is showing an error or blank-state
+	// overlay. Those overlays render inside the normal stacking context and
+	// cannot compete with the fixed z-index overlay, so we hide the webview
+	// wrapper to let the underlying UI show through.
+	const browserState = useTabsStore.getState().panes[paneId]?.browser;
+	if (browserState) {
+		const hasError = browserState.error && !browserState.isLoading;
+		const isBlank =
+			browserState.currentUrl === "about:blank" &&
+			!browserState.isLoading &&
+			!browserState.error;
+		if (hasError || isBlank) {
+			entry.wrapper.style.display = "none";
+			return;
+		}
 	}
 
 	entry.wrapper.style.display = "block";
@@ -328,3 +337,21 @@ export function webviewGoForward(paneId: string): void {
 		if (entry) entry.webview.loadURL(sanitizeUrl(url));
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Drag passthrough — prevent webviews from swallowing pane/tab drags
+// ---------------------------------------------------------------------------
+
+function setAllWrappersPointerEvents(value: string): void {
+	for (const entry of webviews.values()) {
+		entry.wrapper.style.pointerEvents = value;
+	}
+}
+
+window.addEventListener(
+	"dragstart",
+	() => setAllWrappersPointerEvents("none"),
+	true,
+);
+window.addEventListener("dragend", () => setAllWrappersPointerEvents(""), true);
+window.addEventListener("drop", () => setAllWrappersPointerEvents(""), true);
