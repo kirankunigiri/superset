@@ -121,10 +121,20 @@ export interface ChangedFile {
 	deletions: number;
 }
 
+export interface CommitAuthor {
+	name: string;
+	email: string;
+}
+
 export interface Commit {
 	hash: string;
 	shortHash: string;
 	message: string;
 	author: string;
+	email: string;
+	authors: CommitAuthor[];
 	date: string;
+	filesChanged: number;
+	additions: number;
+	deletions: number;
 }

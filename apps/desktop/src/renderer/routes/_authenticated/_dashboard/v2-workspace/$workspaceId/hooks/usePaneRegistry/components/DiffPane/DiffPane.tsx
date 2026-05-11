@@ -96,6 +96,10 @@ export function DiffPane({ context, workspaceId, onOpenFile }: DiffPaneProps) {
 
 	const diffStyle = useSettings((s) => s.diffStyle);
 	const ref = useSidebarDiffRef(workspaceId);
+	const refKey =
+		ref.kind === "commit"
+			? `commit:${ref.commitHash}${ref.fromHash ? `:${ref.fromHash}` : ""}`
+			: ref.kind;
 
 	const { files, isLoading } = useChangeset({ workspaceId, ref });
 
@@ -162,7 +166,7 @@ export function DiffPane({ context, workspaceId, onOpenFile }: DiffPaneProps) {
 			/>
 			{files.map((file) => (
 				<DiffFileEntry
-					key={`${file.source.kind}:${file.path}`}
+					key={`${refKey}:${file.source.kind}:${file.path}`}
 					file={file}
 					workspaceId={workspaceId}
 					diffStyle={diffStyle}

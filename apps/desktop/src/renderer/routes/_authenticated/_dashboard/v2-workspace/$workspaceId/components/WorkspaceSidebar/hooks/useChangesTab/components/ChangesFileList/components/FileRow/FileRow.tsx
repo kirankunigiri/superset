@@ -15,6 +15,7 @@ import {
 } from "@superset/ui/dropdown-menu";
 import { toast } from "@superset/ui/sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
+import { cn } from "@superset/ui/utils";
 import { workspaceTrpc } from "@superset/workspace-client";
 import {
 	ChevronDown,
@@ -47,6 +48,8 @@ interface FileRowProps {
 	file: ChangesetFile;
 	workspaceId: string;
 	worktreePath?: string;
+	isSelected?: boolean;
+	fileIndex?: number;
 	onSelect?: (path: string, openInNewTab?: boolean) => void;
 	onOpenFile?: (absolutePath: string, openInNewTab?: boolean) => void;
 	onOpenInEditor?: (path: string) => void;
@@ -56,6 +59,8 @@ export const FileRow = memo(function FileRow({
 	file,
 	workspaceId,
 	worktreePath,
+	isSelected,
+	fileIndex,
 	onSelect,
 	onOpenFile,
 	onOpenInEditor,
@@ -94,7 +99,11 @@ export const FileRow = memo(function FileRow({
 		<div className="group relative">
 			<button
 				type="button"
-				className="flex w-full items-center gap-1.5 py-1 pr-3 pl-3 text-left text-xs hover:bg-accent/50"
+				data-file-index={fileIndex}
+				className={cn(
+					"flex w-full items-center gap-1.5 py-1 pr-3 pl-3 text-left text-xs outline-none hover:bg-accent/50",
+					isSelected && "bg-accent/60",
+				)}
 				onClick={(e) => {
 					const action = policy.getAction(e);
 					if (action === "external") onOpenInEditor?.(file.path);

@@ -1,4 +1,4 @@
-import { memo, useMemo } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangesetFile } from "renderer/routes/_authenticated/_dashboard/v2-workspace/$workspaceId/hooks/useChangeset";
 import { ChangesSection } from "./components/ChangesSection";
 import { FileRow } from "./components/FileRow";
@@ -38,6 +38,9 @@ export const ChangesFileList = memo(function ChangesFileList({
 	onOpenFile,
 	onOpenInEditor,
 }: ChangesFileListProps) {
+	const containerRef = useRef<HTMLDivElement>(null);
+	const [selectedIndex, setSelectedIndex] = useState(-1);
+
 	const grouped = useMemo(() => {
 		const groups: Record<GroupKey, ChangesetFile[]> = {
 			unstaged: [],
@@ -50,6 +53,58 @@ export const ChangesFileList = memo(function ChangesFileList({
 		}
 		return groups;
 	}, [files]);
+
+	const flatFiles = useMemo(() => {
+		const flat: ChangesetFile[] = [];
+		for (const key of GROUP_ORDER) {
+			flat.push(...grouped[key]);
+		}
+		return flat;
+	}, [grouped]);
+
+	const handleKeyDown = useCallback(
+		(e: React.KeyboardEvent) => {
+			if (flatFiles.length === 0) return;
+			if (e.key === "ArrowDown") {
+				e.preventDefault();
+				const next = Math.min(selectedIndex + 1, flatFiles.length - 1);
+				setSelectedIndex(next);
+				onSelectFile?.(flatFiles[next].path);
+			} else if (e.key === "ArrowUp") {
+				e.preventDefault();
+				const prev = Math.max(selectedIndex - 1, 0);
+				setSelectedIndex(prev);
+				onSelectFile?.(flatFiles[prev].path);
+			}
+		},
+		[selectedIndex, flatFiles, onSelectFile],
+	);
+
+	useEffect(() => {
+		const container = containerRef.current;
+		if (!container || selectedIndex < 0) return;
+		const item = container.querySelector(
+			`[data-file-index="${selectedIndex}"]`,
+		);
+		item?.scrollIntoView({ block: "nearest" });
+	}, [selectedIndex]);
+
+	const prevFilesRef = useRef(flatFiles);
+	useEffect(() => {
+		if (prevFilesRef.current !== flatFiles) {
+			prevFilesRef.current = flatFiles;
+			setSelectedIndex(flatFiles.length > 0 ? 0 : -1);
+		}
+	}, [flatFiles]);
+
+	const handleFileClick = useCallback(
+		(path: string, openInNewTab?: boolean) => {
+			const idx = flatFiles.findIndex((f) => f.path === path);
+			if (idx >= 0) setSelectedIndex(idx);
+			onSelectFile?.(path, openInNewTab);
+		},
+		[flatFiles, onSelectFile],
+	);
 
 	if (isLoading) {
 		return (
@@ -67,12 +122,22 @@ export const ChangesFileList = memo(function ChangesFileList({
 		);
 	}
 
+	let flatIndex = 0;
+
 	return (
-		<div className="min-h-0 flex-1 overflow-y-auto">
+		<div
+			ref={containerRef}
+			role="listbox"
+			tabIndex={0}
+			onKeyDown={handleKeyDown}
+			className="min-h-0 flex-1 overflow-y-auto focus:outline-none"
+		>
 			{GROUP_ORDER.map((key) => {
 				const groupFiles = grouped[key];
 				if (groupFiles.length === 0) return null;
 				const hasStagingActions = key === "unstaged" || key === "staged";
+				const startIndex = flatIndex;
+				flatIndex += groupFiles.length;
 				return (
 					<ChangesSection
 						key={key}
@@ -84,13 +149,15 @@ export const ChangesFileList = memo(function ChangesFileList({
 								: undefined
 						}
 					>
-						{groupFiles.map((file) => (
+						{groupFiles.map((file, i) => (
 							<FileRow
 								key={`${file.source.kind}:${file.path}`}
 								file={file}
 								workspaceId={workspaceId}
 								worktreePath={worktreePath}
-								onSelect={onSelectFile}
+								isSelected={selectedIndex === startIndex + i}
+								fileIndex={startIndex + i}
+								onSelect={handleFileClick}
 								onOpenFile={onOpenFile}
 								onOpenInEditor={onOpenInEditor}
 							/>

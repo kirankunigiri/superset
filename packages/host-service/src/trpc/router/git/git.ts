@@ -253,6 +253,7 @@ export const gitRouter = router({
 			z.object({
 				workspaceId: z.string(),
 				baseBranch: z.string().optional(),
+				limit: z.number().int().positive().optional(),
 			}),
 		)
 		.query(async ({ ctx, input }) => {
@@ -260,24 +261,60 @@ export const gitRouter = router({
 			const git = await ctx.git(worktreePath);
 
 			const base = await resolveBaseComparison(git, input.baseBranch);
-			const baseRef = base?.baseRef ?? "HEAD";
+			const baseRef = base?.baseRef;
 
+			const coAuthorRe = /Co-authored-by:\s*(.+?)\s*<([^>]+)>/i;
 			const commits: Commit[] = [];
 			try {
-				const raw = await git.raw([
+				const range = baseRef ? `${baseRef}..HEAD` : undefined;
+				const args = [
 					"log",
-					`${baseRef}..HEAD`,
-					"--format=%H\t%h\t%s\t%an\t%aI",
-				]);
-				for (const line of raw.trim().split("\n")) {
-					if (!line) continue;
-					const [hash, shortHash, message, author, date] = line.split("\t");
+					...(range ? [range] : ["-n", String(input.limit ?? 50)]),
+					"--format=%x00%H\t%h\t%s\t%an\t%aE\t%aI%x01%b",
+					"--shortstat",
+				];
+				const raw = await git.raw(args);
+				for (const block of raw.split("\0")) {
+					if (!block.trim()) continue;
+					const lines = block.trim().split("\n");
+					const firstLine = lines[0];
+					if (!firstLine) continue;
+					const [headerPart, ...bodyParts] = firstLine.split("\x01");
+					const [hash, shortHash, message, author, email, date] = (
+						headerPart ?? ""
+					).split("\t");
+					const body = bodyParts.join("\x01");
+
+					const authors: { name: string; email: string }[] = [
+						{ name: author ?? "", email: email ?? "" },
+					];
+					for (const line of [body, ...lines.slice(1)]) {
+						const m = line.match(coAuthorRe);
+						if (m?.[1] && m[2]) {
+							authors.push({ name: m[1], email: m[2] });
+						}
+					}
+
+					let filesChanged = 0;
+					let additions = 0;
+					let deletions = 0;
+					const statLine = lines.find((l) => l.includes("file"));
+					if (statLine) {
+						filesChanged = Number(statLine.match(/(\d+) file/)?.[1]) || 0;
+						additions = Number(statLine.match(/(\d+) insertion/)?.[1]) || 0;
+						deletions = Number(statLine.match(/(\d+) deletion/)?.[1]) || 0;
+					}
 					commits.push({
 						hash: hash ?? "",
 						shortHash: shortHash ?? "",
 						message: message ?? "",
 						author: author ?? "",
+						email: email ?? "",
+						authors,
 						date: date ?? "",
+						filesChanged,
+						additions,
+						deletions,
 					});
 				}
 			} catch {}

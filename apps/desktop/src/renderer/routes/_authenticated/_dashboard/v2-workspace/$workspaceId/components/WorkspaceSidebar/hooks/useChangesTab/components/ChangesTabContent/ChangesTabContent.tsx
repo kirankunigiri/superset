@@ -1,10 +1,12 @@
 import type { AppRouter } from "@superset/host-service";
+import { cn } from "@superset/ui/utils";
 import type { inferRouterOutputs } from "@trpc/server";
 import { memo } from "react";
 import type { ChangesFilter } from "renderer/routes/_authenticated/providers/CollectionsProvider/dashboardSidebarLocal/schema";
 import type { ChangesetFile } from "../../../../../../hooks/useChangeset";
 import { ChangesFileList } from "../ChangesFileList";
 import { ChangesHeader } from "../ChangesHeader";
+import { CommitList } from "../CommitList";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
 
@@ -70,6 +72,13 @@ export const ChangesTabContent = memo(function ChangesTabContent({
 		);
 	}
 
+	const isCommitView =
+		filter.kind === "commit" ||
+		filter.kind === "uncommitted" ||
+		filter.kind === "range";
+	const uncommittedCount =
+		status.data.staged.length + status.data.unstaged.length;
+
 	return (
 		<div className="flex h-full min-h-0 flex-col">
 			<ChangesHeader
@@ -82,14 +91,49 @@ export const ChangesTabContent = memo(function ChangesTabContent({
 				filter={filter}
 				onFilterChange={onFilterChange}
 				commits={commits.data?.commits ?? []}
-				uncommittedCount={
-					status.data.staged.length + status.data.unstaged.length
-				}
+				uncommittedCount={uncommittedCount}
 				branches={branches.data?.branches ?? []}
 				onBaseBranchChange={onBaseBranchChange}
 				onRenameBranch={onRenameBranch}
 				canRename={canRenameBranch}
 			/>
+
+			<div className="flex border-b border-border">
+				<button
+					type="button"
+					onClick={() => onFilterChange({ kind: "all" })}
+					className={cn(
+						"flex-1 py-1.5 text-xs font-medium transition-colors",
+						!isCommitView
+							? "border-b-2 border-foreground text-foreground"
+							: "text-muted-foreground hover:text-foreground",
+					)}
+				>
+					All
+				</button>
+				<button
+					type="button"
+					onClick={() => onFilterChange({ kind: "uncommitted" })}
+					className={cn(
+						"flex-1 py-1.5 text-xs font-medium transition-colors",
+						isCommitView
+							? "border-b-2 border-foreground text-foreground"
+							: "text-muted-foreground hover:text-foreground",
+					)}
+				>
+					Commits
+				</button>
+			</div>
+
+			{isCommitView && (
+				<CommitList
+					commits={commits.data?.commits ?? []}
+					filter={filter}
+					onFilterChange={onFilterChange}
+					uncommittedCount={uncommittedCount}
+				/>
+			)}
+
 			<div className="min-h-0 flex-1 overflow-y-auto">
 				<ChangesFileList
 					files={files}
