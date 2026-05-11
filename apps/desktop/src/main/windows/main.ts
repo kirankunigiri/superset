@@ -128,6 +128,28 @@ export async function MainWindow() {
 
 	createApplicationMenu();
 
+	// Dev mode: rewrite Origin header so the production API accepts requests
+	// from localhost (its CORS allowlist doesn't include the Vite dev server).
+	if (isDev) {
+		const ses = window.webContents.session;
+		ses.webRequest.onBeforeSendHeaders(
+			{ urls: ["https://api.superset.sh/*"] },
+			(details, callback) => {
+				details.requestHeaders["Origin"] = "https://app.superset.sh";
+				callback({ requestHeaders: details.requestHeaders });
+			},
+		);
+		ses.webRequest.onHeadersReceived(
+			{ urls: ["https://api.superset.sh/*"] },
+			(details, callback) => {
+				const headers = details.responseHeaders ?? {};
+				headers["access-control-allow-origin"] = ["http://localhost:5173"];
+				headers["access-control-allow-credentials"] = ["true"];
+				callback({ responseHeaders: headers });
+			},
+		);
+	}
+
 	currentWindow = window;
 
 	// macOS Sequoia+: background throttling can corrupt GPU compositor layers

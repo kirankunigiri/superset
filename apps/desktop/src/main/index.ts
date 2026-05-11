@@ -61,7 +61,7 @@ void applyShellEnvToProcess().catch((error) => {
 if (IS_DEV) {
 	const workspaceName = resolveDevWorkspaceName();
 	if (workspaceName) {
-		app.setName(`Superset (${workspaceName})`);
+		app.setName(`Dispatch (${workspaceName})`);
 	}
 }
 

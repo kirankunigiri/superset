@@ -24,7 +24,7 @@ const dmgBackgroundPath = join(
 );
 
 const config: Configuration = {
-	appId: "com.superset.desktop",
+	appId: "com.dispatch.desktop",
 	productName,
 	copyright: `Copyright © ${currentYear} — ${author}`,
 	electronVersion: pkg.devDependencies.electron.replace(/^\^/, ""),
@@ -128,7 +128,7 @@ const config: Configuration = {
 	// Deep linking protocol
 	protocols: {
 		name: productName,
-		schemes: ["superset"],
+		schemes: ["dispatch"],
 	},
 
 	// Linux

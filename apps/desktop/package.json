@@ -1,6 +1,6 @@
 {
 	"name": "@superset/desktop",
-	"productName": "Superset",
+	"productName": "Dispatch",
 	"description": "The last developer tool you'll ever need",
 	"version": "1.8.9",
 	"main": "./dist/main/index.js",
@@ -19,6 +19,7 @@
 		"generate:icons": "bun run scripts/generate-file-icons.ts",
 		"predev": "cross-env NODE_ENV=development bun run clean:dev && bun run generate:icons && cross-env NODE_ENV=development bun run scripts/clean-launch-services.ts && cross-env NODE_ENV=development bun run scripts/patch-dev-protocol.ts",
 		"dev": "cross-env NODE_ENV=development NODE_OPTIONS=--max-old-space-size=8192 electron-vite dev --watch",
+		"dev:prod": "NODE_ENV=development SUPERSET_WORKSPACE_NAME=superset DESKTOP_AUTOMATION_PORT=9333 bun run predev && NODE_ENV=development SUPERSET_WORKSPACE_NAME=superset DESKTOP_AUTOMATION_PORT=9333 NODE_OPTIONS=--max-old-space-size=8192 electron-vite dev --watch",
 		"compile:app": "cross-env NODE_OPTIONS=--max-old-space-size=8192 electron-vite build && bun run scripts/check-pty-daemon-bundle.ts",
 		"check:pty-daemon-bundle": "bun run scripts/check-pty-daemon-bundle.ts",
 		"copy:native-modules": "bun run scripts/copy-native-modules.ts",

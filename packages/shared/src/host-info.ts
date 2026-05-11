@@ -5,7 +5,7 @@ import { homedir, hostname, platform } from "node:os";
 
 // Salt value preserved verbatim across the rename to keep existing host ids
 // stable for users already registered against the cloud.
-const APP_HOST_SALT = "superset-desktop-device-id-v1";
+const APP_HOST_SALT = "dispatch-desktop-device-id-v1";
 
 function getRawMachineId(): string {
 	try {

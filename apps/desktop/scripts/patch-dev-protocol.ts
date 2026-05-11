@@ -187,8 +187,8 @@ export function main() {
 		process.exit(0);
 	}
 
-	const PROTOCOL_SCHEME = `superset-${workspaceName}`;
-	const BUNDLE_ID = `com.superset.desktop.${workspaceName}`;
+	const PROTOCOL_SCHEME = `dispatch-${workspaceName}`;
+	const BUNDLE_ID = `com.dispatch.desktop.${workspaceName}`;
 	const ELECTRON_DIST_DIR = resolve(
 		import.meta.dirname,
 		"../node_modules/electron/dist",
@@ -201,7 +201,7 @@ export function main() {
 		process.exit(0);
 	}
 
-	const DISPLAY_NAME = `Superset (${bundleDisplayWorkspaceName})`;
+	const DISPLAY_NAME = `Dispatch (${bundleDisplayWorkspaceName})`;
 
 	try {
 		const currentBundleId = execSync(

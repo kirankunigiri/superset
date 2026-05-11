@@ -9,10 +9,10 @@ export const PLATFORM = {
 
 const workspace = getWorkspaceName();
 export const SUPERSET_DIR_NAME = workspace
-	? `.superset-${workspace}`
-	: ".superset";
+	? `.dispatch-${workspace}`
+	: ".dispatch";
 export const PROTOCOL_SCHEME = workspace
-	? `superset-${workspace}`
+	? `dispatch-dev-${workspace}`
 	: PROTOCOL_SCHEMES.PROD;
 // Project-level directory name (always .superset, not conditional)
 export const PROJECT_SUPERSET_DIR_NAME = ".superset";
