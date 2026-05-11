@@ -12,7 +12,13 @@ import { workspaceTrpc } from "@superset/workspace-client";
 import { eq } from "@tanstack/db";
 import { useLiveQuery } from "@tanstack/react-db";
 import { Check, ChevronDown, LoaderCircle, Plus, Trash2 } from "lucide-react";
-import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import {
+	useCallback,
+	useMemo,
+	useRef,
+	useState,
+	useSyncExternalStore,
+} from "react";
 import { markTerminalForBackground } from "renderer/lib/terminal/terminal-background-intents";
 import { terminalRuntimeRegistry } from "renderer/lib/terminal/terminal-runtime-registry";
 import type {
@@ -26,6 +32,8 @@ import { TerminalPaneIcon } from "../TerminalPaneIcon";
 interface TerminalSessionDropdownProps {
 	context: RendererContext<PaneViewerData>;
 	workspaceId: string;
+	titleOnly?: boolean;
+	chevronOnly?: boolean;
 }
 
 interface VisibleTerminalSession {
@@ -77,6 +85,8 @@ function getTerminalPaneLocations(
 export function TerminalSessionDropdown({
 	context,
 	workspaceId,
+	titleOnly,
+	chevronOnly,
 }: TerminalSessionDropdownProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const collections = useCollections();
@@ -245,122 +255,178 @@ export function TerminalSessionDropdown({
 	const titleOverride = context.pane.titleOverride;
 	const triggerTitle = hostTitle ?? titleOverride ?? "Terminal";
 
-	return (
-		<DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-			<DropdownMenuTrigger asChild>
-				<button
-					type="button"
-					aria-label="Terminal sessions"
-					title={triggerTitle}
-					className="flex min-w-32 max-w-96 items-center gap-1.5 rounded px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-					onMouseDown={(event) => event.stopPropagation()}
-					onClick={(event) => event.stopPropagation()}
-				>
-					<TerminalPaneIcon terminalId={terminalId} />
-					{workspaceRunState && (
-						<span
-							className={
-								workspaceRunState === "running"
-									? "size-1.5 shrink-0 rounded-full bg-emerald-500"
-									: workspaceRunState === "stopped-by-user"
-										? "size-1.5 shrink-0 rounded-full bg-amber-500"
-										: "size-1.5 shrink-0 rounded-full bg-red-500"
-							}
-							title={`Workspace run: ${workspaceRunState}`}
-						/>
-					)}
-					<span className="min-w-0 flex-1 truncate text-left">
-						{triggerTitle}
-					</span>
-					{sessionsQuery.isFetching && isOpen ? (
-						<LoaderCircle className="size-3 shrink-0 animate-spin" />
-					) : (
-						<ChevronDown className="size-3 shrink-0" />
-					)}
-				</button>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align="start" className="w-96">
-				<DropdownMenuLabel className="flex items-center gap-2 text-xs">
-					<span className="min-w-0 flex-1 truncate">Terminal Sessions</span>
+	const [isRenaming, setIsRenaming] = useState(false);
+	const [renameValue, setRenameValue] = useState("");
+	const renameInputRef = useRef<HTMLInputElement>(null);
+
+	const startRename = () => {
+		setRenameValue(triggerTitle);
+		setIsRenaming(true);
+		requestAnimationFrame(() => renameInputRef.current?.select());
+	};
+
+	const saveRename = () => {
+		const trimmed = renameValue.trim();
+		if (trimmed) {
+			context.actions.setTitle(trimmed);
+		}
+		setIsRenaming(false);
+	};
+
+	if (titleOnly) {
+		return (
+			// biome-ignore lint/a11y/noStaticElementInteractions: stop drag from starting on title area
+			<div
+				className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"
+				onMouseDown={(event) => event.stopPropagation()}
+			>
+				<TerminalPaneIcon terminalId={terminalId} />
+				{workspaceRunState && (
+					<span
+						className={
+							workspaceRunState === "running"
+								? "size-1.5 shrink-0 rounded-full bg-emerald-500"
+								: workspaceRunState === "stopped-by-user"
+									? "size-1.5 shrink-0 rounded-full bg-amber-500"
+									: "size-1.5 shrink-0 rounded-full bg-red-500"
+						}
+						title={`Workspace run: ${workspaceRunState}`}
+					/>
+				)}
+				{isRenaming ? (
+					<input
+						ref={renameInputRef}
+						value={renameValue}
+						onChange={(e) => setRenameValue(e.target.value)}
+						onKeyDown={(e) => {
+							if (e.key === "Enter") saveRename();
+							if (e.key === "Escape") setIsRenaming(false);
+							e.stopPropagation();
+						}}
+						onBlur={saveRename}
+						className="min-w-0 flex-1 rounded border border-border bg-background px-1 py-0.5 text-xs text-foreground outline-none focus:ring-1 focus:ring-ring"
+						maxLength={64}
+					/>
+				) : (
 					<button
 						type="button"
-						aria-label="New terminal"
-						title="New terminal"
-						className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-						onClick={(event) => {
-							event.preventDefault();
-							event.stopPropagation();
-							handleNewTerminal();
+						className="min-w-0 flex-1 cursor-text truncate text-left transition-colors hover:text-foreground"
+						title={triggerTitle}
+						onClick={(e) => {
+							e.stopPropagation();
+							startRename();
 						}}
 					>
-						<Plus className="size-3.5" />
+						{triggerTitle}
 					</button>
-				</DropdownMenuLabel>
-				<DropdownMenuSeparator />
-				<div className="max-h-80 overflow-y-auto">
-					{sessions.length > 0 ? (
-						sessions.map((session) => {
-							const isCurrent = session.terminalId === terminalId;
-							const location = renderTerminalPaneLocations.get(
-								session.terminalId,
-							)?.[0];
-							const createdAtLabel = formatCreatedAt(session.createdAt);
-							const status = isCurrent
-								? "Current"
-								: workspaceRunTerminals[session.terminalId]
-									? "Run"
-									: session.pending
-										? "Starting"
-										: session.attached
-											? "Attached"
-											: "Detached";
-							const title = isCurrent
-								? triggerTitle
-								: (session.title ?? location?.titleOverride ?? "Terminal");
+				)}
+			</div>
+		);
+	}
 
-							return (
-								<DropdownMenuItem
-									key={session.terminalId}
-									className="group flex items-center gap-2"
-									onSelect={(_event) => {
-										handleSelectSession(session);
-									}}
-								>
-									<span className="w-4 shrink-0">
-										{isCurrent && <Check className="size-3.5" />}
-									</span>
-									<span className="min-w-0 flex-1 truncate text-xs">
-										{title}
-									</span>
-									<span className="shrink-0 text-xs text-muted-foreground/70">
-										{createdAtLabel}
-									</span>
-									<span className="shrink-0 text-xs text-muted-foreground">
-										{status}
-									</span>
-									<button
-										type="button"
-										aria-label={`Remove terminal ${session.createdAt ? createdAtLabel : "session"}`}
-										disabled={killTerminalSession.isPending}
-										className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-30 group-hover:opacity-100"
-										onClick={(event) => {
-											event.preventDefault();
-											event.stopPropagation();
-											handleRemoveTerminal(session);
+	if (chevronOnly) {
+		return (
+			<DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+				<DropdownMenuTrigger asChild>
+					<button
+						type="button"
+						aria-label="Terminal sessions"
+						className="flex size-5 shrink-0 items-center justify-center rounded transition-colors hover:bg-muted hover:text-foreground"
+						onClick={(event) => event.stopPropagation()}
+						onMouseDown={(event) => event.stopPropagation()}
+					>
+						{sessionsQuery.isFetching && isOpen ? (
+							<LoaderCircle className="size-3 animate-spin" />
+						) : (
+							<ChevronDown className="size-3" />
+						)}
+					</button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end" className="w-96">
+					<DropdownMenuLabel className="flex items-center gap-2 text-xs">
+						<span className="min-w-0 flex-1 truncate">Terminal Sessions</span>
+						<button
+							type="button"
+							aria-label="New terminal"
+							title="New terminal"
+							className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+							onClick={(event) => {
+								event.preventDefault();
+								event.stopPropagation();
+								handleNewTerminal();
+							}}
+						>
+							<Plus className="size-3.5" />
+						</button>
+					</DropdownMenuLabel>
+					<DropdownMenuSeparator />
+					<div className="max-h-80 overflow-y-auto">
+						{sessions.length > 0 ? (
+							sessions.map((session) => {
+								const isCurrent = session.terminalId === terminalId;
+								const location = renderTerminalPaneLocations.get(
+									session.terminalId,
+								)?.[0];
+								const createdAtLabel = formatCreatedAt(session.createdAt);
+								const status = isCurrent
+									? "Current"
+									: workspaceRunTerminals[session.terminalId]
+										? "Run"
+										: session.pending
+											? "Starting"
+											: session.attached
+												? "Attached"
+												: "Detached";
+								const title = isCurrent
+									? triggerTitle
+									: (session.title ?? location?.titleOverride ?? "Terminal");
+
+								return (
+									<DropdownMenuItem
+										key={session.terminalId}
+										className="group flex items-center gap-2"
+										onSelect={(_event) => {
+											handleSelectSession(session);
 										}}
 									>
-										<Trash2 className="size-3" />
-									</button>
-								</DropdownMenuItem>
-							);
-						})
-					) : (
-						<div className="px-2 py-1.5 text-xs text-muted-foreground">
-							No live sessions
-						</div>
-					)}
-				</div>
-			</DropdownMenuContent>
-		</DropdownMenu>
-	);
+										<span className="w-4 shrink-0">
+											{isCurrent && <Check className="size-3.5" />}
+										</span>
+										<span className="min-w-0 flex-1 truncate text-xs">
+											{title}
+										</span>
+										<span className="shrink-0 text-xs text-muted-foreground/70">
+											{createdAtLabel}
+										</span>
+										<span className="shrink-0 text-xs text-muted-foreground">
+											{status}
+										</span>
+										<button
+											type="button"
+											aria-label={`Remove terminal ${session.createdAt ? createdAtLabel : "session"}`}
+											disabled={killTerminalSession.isPending}
+											className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-30 group-hover:opacity-100"
+											onClick={(event) => {
+												event.preventDefault();
+												event.stopPropagation();
+												handleRemoveTerminal(session);
+											}}
+										>
+											<Trash2 className="size-3" />
+										</button>
+									</DropdownMenuItem>
+								);
+							})
+						) : (
+							<div className="px-2 py-1.5 text-xs text-muted-foreground">
+								No live sessions
+							</div>
+						)}
+					</div>
+				</DropdownMenuContent>
+			</DropdownMenu>
+		);
+	}
+
+	return null;
 }

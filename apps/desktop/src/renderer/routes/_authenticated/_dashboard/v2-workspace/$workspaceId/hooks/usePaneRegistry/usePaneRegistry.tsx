@@ -283,14 +283,25 @@ export function usePaneRegistry({
 				},
 				renderTitle: (ctx: RendererContext<PaneViewerData>) => (
 					<div className="flex min-w-0 flex-1 items-center gap-1.5">
-						<TerminalSessionDropdown context={ctx} workspaceId={workspaceId} />
+						<TerminalSessionDropdown
+							context={ctx}
+							workspaceId={workspaceId}
+							titleOnly
+						/>
 						<V2NotificationStatusIndicator
 							sources={getV2NotificationSourcesForPane(ctx.pane)}
 						/>
 					</div>
 				),
 				renderHeaderExtras: (ctx: RendererContext<PaneViewerData>) => (
-					<TerminalHeaderExtras context={ctx} />
+					<div className="flex items-center gap-0.5">
+						<TerminalSessionDropdown
+							context={ctx}
+							workspaceId={workspaceId}
+							chevronOnly
+						/>
+						<TerminalHeaderExtras context={ctx} />
+					</div>
 				),
 				renderPane: (ctx: RendererContext<PaneViewerData>) => (
 					<TerminalPane
