@@ -78,12 +78,10 @@ export function ReviewComposer({
 				comment.trim(),
 				isStacked,
 			);
-			terminalRuntimeRegistry.writeInput(selectedTerminalId, text);
-			if (sendEnter) {
-				setTimeout(() => {
-					terminalRuntimeRegistry.writeInput(selectedTerminalId, "\r");
-				}, 50);
-			}
+			terminalRuntimeRegistry.writeInput(
+				selectedTerminalId,
+				sendEnter ? `${text}\r` : text,
+			);
 			insertedTerminals.add(selectedTerminalId);
 			onClose();
 		},
