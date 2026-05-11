@@ -12,6 +12,7 @@ import { OrganizationDropdown } from "./components/OrganizationDropdown";
 import { ResourceConsumption } from "./components/ResourceConsumption";
 import { RightSidebarToggle } from "./components/RightSidebarToggle";
 import { SearchBarTrigger } from "./components/SearchBarTrigger";
+import { V2VscodeInlineButton } from "./components/V2VscodeInlineButton";
 import { V2WorkspaceOpenInButton } from "./components/V2WorkspaceOpenInButton";
 import { V2WorkspaceTitle } from "./components/V2WorkspaceTitle";
 import { WindowControls } from "./components/WindowControls";
@@ -94,7 +95,10 @@ export function TopBar() {
 					</div>
 				)}
 				{isV2WorkspaceRoute ? (
-					<V2WorkspaceOpenInButton workspaceId={v2WorkspaceId} />
+					<>
+						<V2VscodeInlineButton workspaceId={v2WorkspaceId} />
+						<V2WorkspaceOpenInButton workspaceId={v2WorkspaceId} />
+					</>
 				) : workspace?.worktreePath ? (
 					<OpenInMenuButton
 						worktreePath={workspace.worktreePath}

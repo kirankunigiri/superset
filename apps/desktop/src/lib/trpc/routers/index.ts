@@ -27,6 +27,7 @@ import { createSettingsRouter } from "./settings";
 import { createSystemRouter } from "./system";
 import { createTerminalRouter } from "./terminal";
 import { createUiStateRouter } from "./ui-state";
+import { createVscodeInlineRouter } from "./vscode-inline";
 import { createWindowRouter } from "./window";
 import { createWorkspacesRouter } from "./workspaces";
 
@@ -61,6 +62,7 @@ export const createAppRouter = (getWindow: () => BrowserWindow | null) => {
 		hostServiceCoordinator: createHostServiceCoordinatorRouter(),
 		keyboardLayout: createKeyboardLayoutRouter(),
 		migration: createMigrationRouter(),
+		vscodeInline: createVscodeInlineRouter(),
 	});
 };
 

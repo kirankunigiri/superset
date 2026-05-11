@@ -243,6 +243,10 @@ app.on("before-quit", async (event) => {
  */
 async function runDevQuitCleanup(): Promise<void> {
 	getHostServiceCoordinator().stopAll();
+	const { getVscodeServeWebManager } = await import(
+		"main/lib/vscode-serve-web"
+	);
+	getVscodeServeWebManager().stopAll();
 	try {
 		await getTerminalHostClient().shutdownIfRunning({ killSessions: true });
 	} catch (err) {
