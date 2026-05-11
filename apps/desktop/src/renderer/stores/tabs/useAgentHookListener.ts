@@ -1,46 +1,416 @@
 import { useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { electronTrpc } from "renderer/lib/electron-trpc";
+import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
+import { terminalRuntimeRegistry } from "renderer/lib/terminal/terminal-runtime-registry";
+import {
+	getV2HostUrl,
+	getV2PaneStore,
+	getV2PaneStores,
+} from "renderer/lib/v2-pane-store-registry";
 import { navigateToWorkspace } from "renderer/routes/_authenticated/_dashboard/utils/workspace-navigation";
 import { NOTIFICATION_EVENTS } from "shared/constants";
 import { debugLog } from "shared/debug";
+import type {
+	AutomationPaneRow,
+	AutomationPaneType,
+	PaneCommand,
+	PaneCommandResult,
+} from "shared/pane-command-types";
 import { useTabsStore } from "./store";
 import { resolveNotificationTarget } from "./utils/resolve-notification-target";
 
-/**
- * Hook that listens for agent lifecycle events via tRPC subscription and updates
- * pane status indicators accordingly.
- *
- * STATUS MAPPING:
- * - Start → "working" (amber pulsing indicator)
- * - Stop → "review" (green static) if pane's tab not active, "idle" if tab is active
- * - PermissionRequest → "permission" (red pulsing indicator)
- * - Terminal Exit → "idle" (handled in Terminal.tsx when mounted; also forwarded via notifications for unmounted panes)
- *
- * KNOWN LIMITATIONS (External - Claude Code / OpenCode hook systems):
- *
- * 1. User Interrupt (Ctrl+C): Claude Code's Stop hook does NOT fire when the user
- *    interrupts the agent. However, the terminal exit handler in Terminal.tsx
- *    will automatically clear the "working" indicator when the process exits.
- *
- * 2. Permission Denied: No hook fires when the user denies a permission request.
- *    The terminal exit handler will clear the "permission" indicator on process exit.
- *
- * 3. Tool Failures: No hook fires when a tool execution fails. The status
- *    continues until the agent stops or terminal exits.
- *
- * Note: Terminal exit detection (in Terminal.tsx) provides a reliable fallback
- * for clearing stuck indicators when agent hooks fail to fire.
- */
+const KIND_TO_TYPE: Record<string, AutomationPaneType> = {
+	terminal: "terminal",
+	browser: "webview",
+	chat: "chat",
+	file: "file-viewer",
+	devtools: "devtools",
+	comment: "comment",
+};
 
-/**
- * Returns the current workspace ID from the live URL hash.
- * The app uses hash routing: file:///.../index.html#/workspace/<id>
- * We must read window.location.hash (not pathname) at event time since the
- * _authenticated layout does not re-render on workspace navigation.
- */
+function requireWorkspaceId(command: PaneCommand): string {
+	if (!command.workspaceId) {
+		throw new Error("Missing workspaceId");
+	}
+	return command.workspaceId;
+}
+
+function requirePaneId(command: PaneCommand): string {
+	if (!command.paneId) {
+		throw new Error("Missing paneId");
+	}
+	return command.paneId;
+}
+
+function listPaneRows(command: PaneCommand): AutomationPaneRow[] {
+	const stores = getV2PaneStores();
+	const rows: AutomationPaneRow[] = [];
+
+	for (const [workspaceId, store] of stores) {
+		if (command.workspaceId && command.workspaceId !== workspaceId) continue;
+		const state = store.getState();
+		for (const tab of state.tabs) {
+			for (const pane of Object.values(tab.panes)) {
+				const paneType = KIND_TO_TYPE[pane.kind];
+				if (!paneType) continue;
+				if (command.type && paneType !== command.type) continue;
+
+				const data = pane.data as unknown as Record<string, unknown>;
+				rows.push({
+					id: pane.id,
+					tabId: tab.id,
+					workspaceId,
+					type: paneType,
+					name: pane.titleOverride ?? pane.kind,
+					url: typeof data?.url === "string" ? data.url : undefined,
+				});
+			}
+		}
+	}
+	return rows;
+}
+
+async function handlePaneCommand(command: PaneCommand): Promise<void> {
+	let result: PaneCommandResult;
+
+	try {
+		switch (command.action) {
+			case "listPanes": {
+				result = {
+					requestId: command.requestId,
+					success: true,
+					panes: listPaneRows(command),
+				};
+				break;
+			}
+			case "createTerminal": {
+				const workspaceId = requireWorkspaceId(command);
+				const store = getV2PaneStore(workspaceId);
+				if (!store) throw new Error("Workspace not mounted");
+				const hostUrl = getV2HostUrl(workspaceId);
+				if (!hostUrl) throw new Error("Host service URL not available");
+
+				const terminalId = crypto.randomUUID();
+				const paneId = `pane-${Date.now()}-${terminalId.slice(0, 8)}`;
+				const tabId = `tab-${Date.now()}-${terminalId.slice(0, 8)}`;
+				const hostClient = getHostServiceClientByUrl(hostUrl);
+				await hostClient.terminal.createSession.mutate({
+					terminalId,
+					workspaceId,
+					themeType: "dark",
+					cwd: command.initialCwd,
+					initialCommand: command.command,
+				});
+				const newPane = {
+					id: paneId,
+					kind: "terminal" as const,
+					data: { terminalId },
+				};
+				const state = store.getState();
+				if (command.split) {
+					const activeTab = state.getActiveTab();
+					if (!activeTab) throw new Error("No active tab");
+					const activePane = state.getActivePane(activeTab.id);
+					if (!activePane) throw new Error("No active pane");
+					state.splitPane({
+						tabId: activeTab.id,
+						paneId: activePane.pane.id,
+						position: command.split === "below" ? "bottom" : "right",
+						newPane,
+						selectNewPane: true,
+					});
+					result = {
+						requestId: command.requestId,
+						success: true,
+						tabId: activeTab.id,
+						paneId,
+					};
+				} else {
+					state.addTab({ id: tabId, panes: [newPane] });
+					result = {
+						requestId: command.requestId,
+						success: true,
+						tabId,
+						paneId,
+					};
+				}
+				break;
+			}
+			case "createBrowser": {
+				const workspaceId = requireWorkspaceId(command);
+				const store = getV2PaneStore(workspaceId);
+				if (!store) throw new Error("Workspace not mounted");
+
+				const paneId = `pane-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+				const state = store.getState();
+				if (command.split) {
+					const activeTab = state.getActiveTab();
+					if (!activeTab) throw new Error("No active tab");
+					const activePane = state.getActivePane(activeTab.id);
+					if (!activePane) throw new Error("No active pane");
+					state.splitPane({
+						tabId: activeTab.id,
+						paneId: activePane.pane.id,
+						position: command.split === "below" ? "bottom" : "right",
+						newPane: {
+							id: paneId,
+							kind: "browser",
+							data: { url: command.url ?? "about:blank" },
+						},
+						selectNewPane: true,
+					});
+					result = {
+						requestId: command.requestId,
+						success: true,
+						tabId: activeTab.id,
+						paneId,
+					};
+				} else {
+					const tabId = `tab-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+					state.addTab({
+						id: tabId,
+						panes: [
+							{
+								id: paneId,
+								kind: "browser",
+								data: { url: command.url ?? "about:blank" },
+							},
+						],
+					});
+					result = {
+						requestId: command.requestId,
+						success: true,
+						tabId,
+						paneId,
+					};
+				}
+				break;
+			}
+			case "createChat": {
+				const workspaceId = requireWorkspaceId(command);
+				const store = getV2PaneStore(workspaceId);
+				if (!store) throw new Error("Workspace not mounted");
+
+				const paneId = `pane-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+				const state = store.getState();
+				if (command.split) {
+					const activeTab = state.getActiveTab();
+					if (!activeTab) throw new Error("No active tab");
+					const activePane = state.getActivePane(activeTab.id);
+					if (!activePane) throw new Error("No active pane");
+					state.splitPane({
+						tabId: activeTab.id,
+						paneId: activePane.pane.id,
+						position: command.split === "below" ? "bottom" : "right",
+						newPane: {
+							id: paneId,
+							kind: "chat",
+							data: { sessionId: null },
+						},
+						selectNewPane: true,
+					});
+					result = {
+						requestId: command.requestId,
+						success: true,
+						tabId: activeTab.id,
+						paneId,
+					};
+				} else {
+					const tabId = `tab-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+					state.addTab({
+						id: tabId,
+						panes: [
+							{
+								id: paneId,
+								kind: "chat",
+								data: { sessionId: null },
+							},
+						],
+					});
+					result = {
+						requestId: command.requestId,
+						success: true,
+						tabId,
+						paneId,
+					};
+				}
+				break;
+			}
+			case "createFile": {
+				const workspaceId = requireWorkspaceId(command);
+				const store = getV2PaneStore(workspaceId);
+				if (!store) throw new Error("Workspace not mounted");
+				if (!command.filePath) throw new Error("Missing filePath");
+
+				const paneId = `pane-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+				const newPane = {
+					id: paneId,
+					kind: "file" as const,
+					data: { filePath: command.filePath, mode: "editor" as const },
+				};
+				const state = store.getState();
+				if (command.split) {
+					const activeTab = state.getActiveTab();
+					if (!activeTab) throw new Error("No active tab");
+					const activePane = state.getActivePane(activeTab.id);
+					if (!activePane) throw new Error("No active pane");
+					state.splitPane({
+						tabId: activeTab.id,
+						paneId: activePane.pane.id,
+						position: command.split === "below" ? "bottom" : "right",
+						newPane,
+						selectNewPane: true,
+					});
+					result = {
+						requestId: command.requestId,
+						success: true,
+						tabId: activeTab.id,
+						paneId,
+					};
+				} else {
+					const tabId = `tab-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+					state.addTab({ id: tabId, panes: [newPane] });
+					result = {
+						requestId: command.requestId,
+						success: true,
+						tabId,
+						paneId,
+					};
+				}
+				break;
+			}
+			case "closePane": {
+				const paneId = requirePaneId(command);
+				const stores = getV2PaneStores();
+				let found = false;
+				for (const store of stores.values()) {
+					const location = store.getState().getPane(paneId);
+					if (location) {
+						store.getState().closePane({
+							tabId: location.tabId,
+							paneId,
+						});
+						found = true;
+						break;
+					}
+				}
+				if (!found) throw new Error(`Pane not found: ${paneId}`);
+				result = {
+					requestId: command.requestId,
+					success: true,
+					paneId,
+				};
+				break;
+			}
+			case "focusPane": {
+				const paneId = requirePaneId(command);
+				const stores = getV2PaneStores();
+				let foundTabId: string | undefined;
+				for (const store of stores.values()) {
+					const location = store.getState().getPane(paneId);
+					if (location) {
+						store.getState().setActiveTab(location.tabId);
+						store.getState().setActivePane({ tabId: location.tabId, paneId });
+						foundTabId = location.tabId;
+						break;
+					}
+				}
+				if (!foundTabId) throw new Error(`Pane not found: ${paneId}`);
+				result = {
+					requestId: command.requestId,
+					success: true,
+					tabId: foundTabId,
+					paneId,
+				};
+				break;
+			}
+			case "readTerminal": {
+				const paneId = requirePaneId(command);
+				let terminalId: string | undefined;
+				for (const store of getV2PaneStores().values()) {
+					const location = store.getState().getPane(paneId);
+					if (location && location.pane.kind === "terminal") {
+						terminalId = (location.pane.data as { terminalId?: string })
+							.terminalId;
+						break;
+					}
+				}
+				const terminal = terminalRuntimeRegistry.getTerminal(
+					terminalId ?? paneId,
+				);
+				if (!terminal) throw new Error("Terminal is not mounted");
+
+				const buffer = terminal.buffer.active;
+				const lines: string[] = [];
+				for (let i = 0; i <= buffer.baseY + buffer.cursorY; i += 1) {
+					const line = buffer.getLine(i);
+					if (line) lines.push(line.translateToString(true));
+				}
+
+				const content =
+					command.lines && command.lines > 0
+						? lines.slice(-command.lines).join("\n")
+						: lines.join("\n");
+				result = {
+					requestId: command.requestId,
+					success: true,
+					paneId,
+					content,
+				};
+				break;
+			}
+			case "writeTerminal": {
+				const paneId = requirePaneId(command);
+				if (!command.data) throw new Error("Missing data");
+				let terminalId: string | undefined;
+				for (const store of getV2PaneStores().values()) {
+					const location = store.getState().getPane(paneId);
+					if (location && location.pane.kind === "terminal") {
+						terminalId = (location.pane.data as { terminalId?: string })
+							.terminalId;
+						break;
+					}
+				}
+				if (!terminalId) throw new Error(`Terminal pane not found: ${paneId}`);
+				terminalRuntimeRegistry.writeInput(terminalId, command.data);
+				result = {
+					requestId: command.requestId,
+					success: true,
+					paneId,
+				};
+				break;
+			}
+			case "getCurrentWorkspace": {
+				const match = window.location.hash.match(
+					/\/(?:workspace|v2-workspace)\/([^/?#]+)/,
+				);
+				result = {
+					requestId: command.requestId,
+					success: true,
+					workspaceId: match?.[1] ?? undefined,
+				};
+				break;
+			}
+			default:
+				throw new Error(`Unknown pane command: ${command.action}`);
+		}
+	} catch (err) {
+		result = {
+			requestId: command.requestId,
+			success: false,
+			error: err instanceof Error ? err.message : String(err),
+		};
+	}
+
+	window.ipcRenderer.send("automation:pane-command-result", result);
+}
+
 function getCurrentWorkspaceId(): string | null {
 	try {
-		const match = window.location.hash.match(/\/workspace\/([^/?#]+)/);
+		const match = window.location.hash.match(
+			/\/(?:workspace|v2-workspace)\/([^/?#]+)/,
+		);
 		return match ? match[1] : null;
 	} catch {
 		return null;
@@ -49,6 +419,13 @@ function getCurrentWorkspaceId(): string | null {
 
 export function useAgentHookListener() {
 	const navigate = useNavigate();
+
+	useEffect(() => {
+		window.ipcRenderer.on("automation:pane-command", handlePaneCommand);
+		return () => {
+			window.ipcRenderer.off("automation:pane-command", handlePaneCommand);
+		};
+	}, []);
 
 	electronTrpc.notifications.subscribe.useSubscription(undefined, {
 		onData: (event) => {
@@ -82,17 +459,13 @@ export function useAgentHookListener() {
 					const activeTabId = state.activeTabIds[workspaceId];
 					const pane = state.panes[paneId];
 					const tabId = pane?.tabId;
-					// Tab must be active for this workspace
 					const isTabActive = tabId != null && tabId === activeTabId;
-					// User is on this workspace if the URL hash matches OR if they have this
-					// pane focused (more reliable than URL parsing which can lag behind navigation)
 					const isPaneFocused =
 						tabId != null && state.focusedPaneIds[tabId] === paneId;
 					const isInActiveTab =
 						isTabActive &&
 						(getCurrentWorkspaceId() === workspaceId || isPaneFocused);
 
-					// If stopping from a pending question state, always go idle (user already engaged)
 					const nextStatus =
 						pane?.status === "permission"
 							? "idle"
@@ -112,7 +485,6 @@ export function useAgentHookListener() {
 					state.setPaneStatus(paneId, nextStatus);
 				}
 			} else if (event.type === NOTIFICATION_EVENTS.TERMINAL_EXIT) {
-				// Clear transient status for unmounted panes (mounted panes handle this via stream subscription)
 				if (!paneId) return;
 				const currentPane = state.panes[paneId];
 				if (

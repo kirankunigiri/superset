@@ -5,6 +5,7 @@ import { handleAuthCallback } from "lib/trpc/routers/auth/utils/auth-functions";
 import { NOTIFICATION_EVENTS } from "shared/constants";
 import { env } from "shared/env.shared";
 import type { AgentLifecycleEvent } from "shared/notification-types";
+import { automationHttpMiddleware } from "../automation/router";
 import { HOOK_PROTOCOL_VERSION } from "../terminal/env";
 import { mapEventType } from "./map-event-type";
 import { resolvePaneId } from "./resolve-pane-id";
@@ -34,6 +35,8 @@ const DEBUG_HOOKS_ENABLED =
 export const notificationsEmitter = new EventEmitter();
 
 const app = express();
+
+app.use("/automation/trpc", automationHttpMiddleware);
 
 // Parse JSON request bodies
 app.use(express.json());

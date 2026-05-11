@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Wrapper to run the dev CLI from anywhere
+export SUPERSET_CLI_CWD="$PWD"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$REPO_ROOT" && exec bun run --filter @superset/cli dev -- "$@"

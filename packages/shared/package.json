@@ -119,6 +119,10 @@
 		"./rrule": {
 			"types": "./src/rrule.ts",
 			"default": "./src/rrule.ts"
+		},
+		"./automation-types": {
+			"types": "./src/automation-types.ts",
+			"default": "./src/automation-types.ts"
 		}
 	},
 	"scripts": {

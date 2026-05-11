@@ -13,6 +13,7 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
+		"@modelcontextprotocol/sdk": "^1.26.0",
 		"@clack/prompts": "^0.10.0",
 		"@superset/cli-framework": "workspace:*",
 		"@superset/host-service": "workspace:*",
@@ -23,7 +24,8 @@
 		"ink": "^7.0.1",
 		"mime-types": "^3.0.2",
 		"react": "19.2.0",
-		"superjson": "^2.2.5"
+		"superjson": "^2.2.5",
+		"zod": "^4.3.5"
 	},
 	"devDependencies": {
 		"@superset/typescript": "workspace:*",

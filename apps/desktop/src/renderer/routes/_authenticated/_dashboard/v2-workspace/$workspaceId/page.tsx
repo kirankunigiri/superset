@@ -5,6 +5,10 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useV2UserPreferences } from "renderer/hooks/useV2UserPreferences";
 import { useHotkey } from "renderer/hotkeys";
+import {
+	registerV2PaneStore,
+	unregisterV2PaneStore,
+} from "renderer/lib/v2-pane-store-registry";
 import { CommandPalette } from "renderer/screens/main/components/CommandPalette";
 import { ResizablePanel } from "renderer/screens/main/components/ResizablePanel";
 import { getV2NotificationSourcesForTab } from "renderer/stores/v2-notifications";
@@ -107,7 +111,7 @@ function V2WorkspaceContent() {
 		openUrlTarget,
 		openUrlRequestId,
 	} = Route.useSearch();
-	const { workspace } = useWorkspace();
+	const { workspace, hostUrl } = useWorkspace();
 	const workspaceId = workspace.id;
 
 	const {
@@ -119,6 +123,10 @@ function V2WorkspaceContent() {
 	} = useV2UserPreferences();
 	const showPresetsBar = v2UserPreferences.showPresetsBar;
 	const { store } = useV2WorkspacePaneLayout();
+	useEffect(() => {
+		registerV2PaneStore(workspaceId, store, hostUrl);
+		return () => unregisterV2PaneStore(workspaceId);
+	}, [workspaceId, store, hostUrl]);
 	useClearActivePaneAttention({ store });
 	const launcher = useV2TerminalLauncher();
 	const { matchedPresets, executePreset, resolvePresetCommands } =

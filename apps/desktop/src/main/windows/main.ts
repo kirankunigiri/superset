@@ -135,7 +135,7 @@ export async function MainWindow() {
 		ses.webRequest.onBeforeSendHeaders(
 			{ urls: ["https://api.superset.sh/*"] },
 			(details, callback) => {
-				details.requestHeaders["Origin"] = "https://app.superset.sh";
+				details.requestHeaders.Origin = "https://app.superset.sh";
 				callback({ requestHeaders: details.requestHeaders });
 			},
 		);
