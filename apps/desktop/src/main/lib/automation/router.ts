@@ -1,10 +1,15 @@
 import { randomUUID } from "node:crypto";
+import { existsSync, readdirSync } from "node:fs";
+import path from "node:path";
 import { TRPCError } from "@trpc/server";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
+import Database from "better-sqlite3";
 import { BrowserWindow, ipcMain } from "electron";
 import type { RequestHandler } from "express";
 import { Router as ExpressRouter } from "express";
 import { publicProcedure, router } from "lib/trpc";
+import { SUPERSET_HOME_DIR } from "main/lib/app-environment";
+import { browserManager } from "main/lib/browser/browser-manager";
 import type {
 	AutomationPaneType,
 	PaneCommand,
@@ -80,27 +85,60 @@ async function runPaneCommand(
 	return result;
 }
 
-async function getVisibleWorkspaceId(): Promise<string | null> {
-	try {
-		const result = await sendPaneCommand({ action: "getCurrentWorkspace" });
-		return result.workspaceId ?? null;
-	} catch {
-		return null;
+function getWorkspaceIdForCwd(cwd: string): string | null {
+	const normalizedCwd = path.resolve(cwd).toLowerCase();
+	const hostDir = path.join(SUPERSET_HOME_DIR, "host");
+
+	console.log(
+		`[automation] getWorkspaceIdForCwd: hostDir=${hostDir} exists=${existsSync(hostDir)}`,
+	);
+	if (!existsSync(hostDir)) return null;
+
+	for (const orgId of readdirSync(hostDir)) {
+		const dbPath = path.join(hostDir, orgId, "host.db");
+		if (!existsSync(dbPath)) continue;
+
+		try {
+			const db = new Database(dbPath, { readonly: true });
+			const rows = db
+				.prepare("SELECT id, worktree_path FROM workspaces")
+				.all() as Array<{ id: string; worktree_path: string }>;
+			db.close();
+			console.log(
+				`[automation] host DB ${orgId}: ${rows.length} workspaces, paths=[${rows.map((r) => r.worktree_path).join(", ")}]`,
+			);
+
+			for (const row of rows) {
+				const resolved = path.resolve(row.worktree_path).toLowerCase();
+				if (resolved === normalizedCwd) {
+					console.log(
+						`[automation] MATCHED workspace ${row.id} path=${row.worktree_path}`,
+					);
+					return row.id;
+				}
+			}
+			console.log(`[automation] no match for normalizedCwd=${normalizedCwd}`);
+		} catch {}
 	}
+
+	return null;
 }
 
-async function resolveWorkspaceId(
+function resolveWorkspaceId(
 	explicitWorkspaceId?: string,
-): Promise<string> {
+	cwd?: string,
+): string {
 	if (explicitWorkspaceId) return explicitWorkspaceId;
 
-	const visibleWorkspaceId = await getVisibleWorkspaceId();
-	if (visibleWorkspaceId) return visibleWorkspaceId;
+	if (cwd) {
+		const cwdWorkspaceId = getWorkspaceIdForCwd(cwd);
+		if (cwdWorkspaceId) return cwdWorkspaceId;
+	}
 
 	throw new TRPCError({
 		code: "PRECONDITION_FAILED",
 		message:
-			"Could not determine workspace. Open a workspace in the desktop app or provide workspaceId.",
+			"Could not determine workspace. Provide a cwd that matches a workspace's project directory, or pass workspaceId explicitly.",
 	});
 }
 
@@ -111,14 +149,16 @@ export const automationRouter = router({
 				z
 					.object({
 						workspaceId: z.string().min(1).optional(),
+						cwd: z.string().min(1).optional(),
 						type: paneTypeSchema.optional(),
 					})
 					.optional(),
 			)
 			.query(async ({ input }) => {
+				const workspaceId = resolveWorkspaceId(input?.workspaceId, input?.cwd);
 				const result = await runPaneCommand({
 					action: "listPanes",
-					workspaceId: input?.workspaceId,
+					workspaceId,
 					type: input?.type as AutomationPaneType | undefined,
 				});
 				return result.panes ?? [];
@@ -129,6 +169,7 @@ export const automationRouter = router({
 				z.object({
 					type: creatablePaneTypeSchema,
 					workspaceId: z.string().min(1).optional(),
+					cwd: z.string().min(1).optional(),
 					tabId: z.string().min(1).optional(),
 					split: splitSchema.optional(),
 					initialCwd: z.string().min(1).optional(),
@@ -138,7 +179,7 @@ export const automationRouter = router({
 				}),
 			)
 			.mutation(async ({ input }) => {
-				const workspaceId = await resolveWorkspaceId(input.workspaceId);
+				const workspaceId = resolveWorkspaceId(input.workspaceId, input.cwd);
 				const actionByType = {
 					terminal: "createTerminal",
 					browser: "createBrowser",
@@ -165,6 +206,10 @@ export const automationRouter = router({
 						code: "INTERNAL_SERVER_ERROR",
 						message: "Pane command succeeded without returning pane details",
 					});
+				}
+
+				if (input.type === "browser" && input.cwd) {
+					browserManager.registerPendingCwd(result.paneId, input.cwd);
 				}
 
 				return { tabId: result.tabId, paneId: result.paneId };

@@ -8,6 +8,10 @@ import SuperJSON from "superjson";
 
 export type { AutomationPaneRow, AutomationPaneType };
 
+export function getCallerCwd(): string {
+	return process.env.SUPERSET_CLI_CWD || process.cwd();
+}
+
 const DEFAULT_AUTOMATION_PORT = 51741;
 
 export interface PaneResult {
@@ -67,6 +71,7 @@ async function automationMutation<T>(
 
 export function listPanes(input: {
 	workspaceId?: string;
+	cwd?: string;
 	type?: AutomationPaneType;
 }): Promise<AutomationPaneRow[]> {
 	return automationQuery("panes.list", input);
@@ -75,6 +80,7 @@ export function listPanes(input: {
 export function createPane(input: {
 	type: "terminal" | "browser" | "chat" | "file";
 	workspaceId?: string;
+	cwd?: string;
 	tabId?: string;
 	split?: "right" | "below";
 	initialCwd?: string;

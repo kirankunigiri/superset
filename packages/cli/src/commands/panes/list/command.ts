@@ -2,6 +2,7 @@ import { string, table } from "@superset/cli-framework";
 import { command } from "../../../lib/command";
 import {
 	type AutomationPaneType,
+	getCallerCwd,
 	listPanes,
 } from "../../../lib/desktop-automation";
 
@@ -23,6 +24,7 @@ export default command({
 	run: async ({ options }) => {
 		const panes = await listPanes({
 			workspaceId: options.workspace ?? undefined,
+			cwd: getCallerCwd(),
 			type: (options.type as AutomationPaneType | undefined) ?? undefined,
 		});
 

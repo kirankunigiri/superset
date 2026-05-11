@@ -1,6 +1,6 @@
 import { string } from "@superset/cli-framework";
 import { command } from "../../../../lib/command";
-import { createPane } from "../../../../lib/desktop-automation";
+import { createPane, getCallerCwd } from "../../../../lib/desktop-automation";
 
 export default command({
 	description: "Open a new chat pane",
@@ -18,6 +18,7 @@ export default command({
 		const result = await createPane({
 			type: "chat",
 			workspaceId: options.workspace ?? undefined,
+			cwd: getCallerCwd(),
 			split: options.split ?? undefined,
 		});
 

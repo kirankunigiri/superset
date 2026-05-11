@@ -392,6 +392,41 @@ async function handlePaneCommand(command: PaneCommand): Promise<void> {
 				};
 				break;
 			}
+			case "getWorkspaceForCwd": {
+				if (!command.cwd) throw new Error("Missing cwd");
+				const targetCwd = command.cwd.toLowerCase();
+				let matchedWorkspaceId: string | undefined;
+				const stores = getV2PaneStores();
+				console.log(
+					`[getWorkspaceForCwd] searching ${stores.size} workspaces for cwd=${command.cwd}`,
+				);
+				for (const [wsId] of stores) {
+					const hostUrl = getV2HostUrl(wsId);
+					if (!hostUrl) {
+						console.log(`[getWorkspaceForCwd] ${wsId}: no hostUrl`);
+						continue;
+					}
+					try {
+						const client = getHostServiceClientByUrl(hostUrl);
+						const info = await client.workspace.get.query({ id: wsId });
+						console.log(
+							`[getWorkspaceForCwd] ${wsId}: worktreePath=${info?.worktreePath}`,
+						);
+						if (info?.worktreePath?.toLowerCase() === targetCwd) {
+							matchedWorkspaceId = wsId;
+							break;
+						}
+					} catch (err) {
+						console.log(`[getWorkspaceForCwd] ${wsId}: query failed`, err);
+					}
+				}
+				result = {
+					requestId: command.requestId,
+					success: true,
+					workspaceId: matchedWorkspaceId,
+				};
+				break;
+			}
 			default:
 				throw new Error(`Unknown pane command: ${command.action}`);
 		}

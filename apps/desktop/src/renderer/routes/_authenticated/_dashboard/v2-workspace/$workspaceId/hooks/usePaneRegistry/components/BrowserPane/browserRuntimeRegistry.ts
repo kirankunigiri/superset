@@ -187,7 +187,11 @@ class BrowserRuntimeRegistryImpl {
 		this.setState(paneId, { canGoBack, canGoForward });
 	}
 
-	private createEntry(paneId: string, initialUrl: string): RegistryEntry {
+	private createEntry(
+		paneId: string,
+		initialUrl: string,
+		workspaceCwd?: string,
+	): RegistryEntry {
 		const webview = document.createElement("webview") as Electron.WebviewTag;
 		webview.setAttribute("partition", "persist:superset");
 		webview.setAttribute("allowpopups", "");
@@ -227,7 +231,7 @@ class BrowserRuntimeRegistryImpl {
 			if (entry.webContentsId !== webContentsId) {
 				entry.webContentsId = webContentsId;
 				electronTrpcClient.browser.register
-					.mutate({ paneId, webContentsId })
+					.mutate({ paneId, webContentsId, workspaceCwd })
 					.catch((err) => {
 						console.error("[browserRuntimeRegistry] register failed:", err);
 					});
@@ -368,11 +372,12 @@ class BrowserRuntimeRegistryImpl {
 		placeholder: HTMLElement,
 		initialUrl: string,
 		onPersist: (state: PersistableBrowserState) => void,
+		workspaceCwd?: string,
 	): void {
 		const root = this.ensureRootContainer();
 		let entry = this.entries.get(paneId);
 		if (!entry) {
-			entry = this.createEntry(paneId, initialUrl);
+			entry = this.createEntry(paneId, initialUrl, workspaceCwd);
 			this.entries.set(paneId, entry);
 			root.appendChild(entry.webview);
 		} else {

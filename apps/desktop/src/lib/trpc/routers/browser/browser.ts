@@ -7,9 +7,26 @@ import { publicProcedure, router } from "../..";
 export const createBrowserRouter = () => {
 	return router({
 		register: publicProcedure
-			.input(z.object({ paneId: z.string(), webContentsId: z.number() }))
+			.input(
+				z.object({
+					paneId: z.string(),
+					webContentsId: z.number(),
+					workspaceCwd: z.string().optional(),
+				}),
+			)
 			.mutation(({ input }) => {
-				browserManager.register(input.paneId, input.webContentsId);
+				browserManager.register(
+					input.paneId,
+					input.webContentsId,
+					input.workspaceCwd,
+				);
+				return { success: true };
+			}),
+
+		setCwd: publicProcedure
+			.input(z.object({ paneId: z.string(), workspaceCwd: z.string() }))
+			.mutation(({ input }) => {
+				browserManager.setCwd(input.paneId, input.workspaceCwd);
 				return { success: true };
 			}),
 
@@ -156,7 +173,10 @@ export const createBrowserRouter = () => {
 				const wc = browserManager.getWebContents(input.paneId);
 				if (!wc) return { url: null };
 				const targetUrl = wc.getURL();
-				const cdpPort = process.env.DESKTOP_AUTOMATION_PORT || "9333";
+				const cdpPort =
+					process.env.DESKTOP_CDP_PROXY_PORT ||
+					process.env.DESKTOP_AUTOMATION_PORT ||
+					"9333";
 				try {
 					const resp = await fetch(`http://127.0.0.1:${cdpPort}/json`);
 					const targets: Array<{

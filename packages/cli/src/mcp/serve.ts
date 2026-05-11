@@ -25,6 +25,8 @@ function errorResult(error: unknown) {
 	};
 }
 
+console.error(`[superset-panes] MCP started, cwd=${process.cwd()}`);
+
 const server = new McpServer(
 	{ name: "superset-panes", version: "0.1.0" },
 	{ capabilities: { tools: {} } },
@@ -57,6 +59,7 @@ server.registerTool(
 		try {
 			const panes = await listPanes({
 				workspaceId: args.workspaceId,
+				cwd: process.cwd(),
 				type: args.type,
 			});
 			return textResult(panes);
@@ -89,6 +92,7 @@ server.registerTool(
 			const result = await createPane({
 				type: "terminal",
 				workspaceId: args.workspaceId,
+				cwd: process.cwd(),
 				initialCwd: args.cwd,
 				split: args.split,
 				command: args.cmd,
@@ -122,6 +126,7 @@ server.registerTool(
 			const result = await createPane({
 				type: "browser",
 				workspaceId: args.workspaceId,
+				cwd: process.cwd(),
 				url: args.url,
 				split: args.split,
 			});
@@ -152,6 +157,7 @@ server.registerTool(
 			const result = await createPane({
 				type: "chat",
 				workspaceId: args.workspaceId,
+				cwd: process.cwd(),
 				split: args.split,
 			});
 			return textResult(result);
@@ -182,6 +188,7 @@ server.registerTool(
 			const result = await createPane({
 				type: "file",
 				workspaceId: args.workspaceId,
+				cwd: process.cwd(),
 				filePath: args.filePath,
 				split: args.split,
 			});

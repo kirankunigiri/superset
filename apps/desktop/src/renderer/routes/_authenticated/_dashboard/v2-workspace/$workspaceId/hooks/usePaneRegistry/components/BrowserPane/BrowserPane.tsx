@@ -1,8 +1,10 @@
 import type { RendererContext, Tab } from "@superset/panes";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
+import { workspaceTrpc } from "@superset/workspace-client";
 import { GlobeIcon } from "lucide-react";
 import { useCallback, useSyncExternalStore } from "react";
 import { TbDeviceDesktop } from "react-icons/tb";
+import { useWorkspace } from "renderer/routes/_authenticated/_dashboard/v2-workspace/providers/WorkspaceProvider";
 import type { BrowserPaneData, PaneViewerData } from "../../../../types";
 
 import { browserRuntimeRegistry } from "./browserRuntimeRegistry";
@@ -46,7 +48,16 @@ function useBrowserState(paneId: string) {
 export function BrowserPane({ ctx }: BrowserPaneProps) {
 	const paneId = ctx.pane.id;
 	const state = useBrowserState(paneId);
-	const { placeholderRef, reload } = usePersistentWebview({ paneId, ctx });
+	const { workspace } = useWorkspace();
+	const workspaceStatus = workspaceTrpc.workspace.get.useQuery(
+		{ id: workspace.id },
+		{ staleTime: 60_000 },
+	);
+	const { placeholderRef, reload } = usePersistentWebview({
+		paneId,
+		ctx,
+		workspaceCwd: workspaceStatus.data?.worktreePath,
+	});
 
 	const isBlankPage = !state.currentUrl || state.currentUrl === "about:blank";
 

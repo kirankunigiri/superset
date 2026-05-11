@@ -25,11 +25,17 @@ function sanitizeUrl(url: string): string {
 
 class BrowserManager extends EventEmitter {
 	private paneWebContentsIds = new Map<string, number>();
+	private webContentsCwds = new Map<number, string>();
+	private pendingCwds = new Map<string, string>();
 	private consoleLogs = new Map<string, ConsoleEntry[]>();
 	private consoleListeners = new Map<string, () => void>();
 	private contextMenuListeners = new Map<string, () => void>();
 
-	register(paneId: string, webContentsId: number): void {
+	registerPendingCwd(paneId: string, cwd: string): void {
+		this.pendingCwds.set(paneId, cwd);
+	}
+
+	register(paneId: string, webContentsId: number, workspaceCwd?: string): void {
 		// Clean up previous listeners if re-registering with a new webContentsId
 		const prevId = this.paneWebContentsIds.get(paneId);
 		if (prevId != null && prevId !== webContentsId) {
@@ -42,6 +48,11 @@ class BrowserManager extends EventEmitter {
 			}
 		}
 		this.paneWebContentsIds.set(paneId, webContentsId);
+		const cwd = workspaceCwd ?? this.pendingCwds.get(paneId);
+		if (cwd) {
+			this.webContentsCwds.set(webContentsId, cwd);
+			this.pendingCwds.delete(paneId);
+		}
 		const wc = webContents.fromId(webContentsId);
 		if (wc) {
 			// Keep throttling enabled so parked/offscreen persistent webviews don't
@@ -66,6 +77,8 @@ class BrowserManager extends EventEmitter {
 				map.delete(paneId);
 			}
 		}
+		const wcId = this.paneWebContentsIds.get(paneId);
+		if (wcId != null) this.webContentsCwds.delete(wcId);
 		this.paneWebContentsIds.delete(paneId);
 		this.consoleLogs.delete(paneId);
 	}
@@ -82,6 +95,19 @@ class BrowserManager extends EventEmitter {
 		const wc = webContents.fromId(id);
 		if (!wc || wc.isDestroyed()) return null;
 		return wc;
+	}
+
+	getCwdForWebContentsId(webContentsId: number): string | undefined {
+		return this.webContentsCwds.get(webContentsId);
+	}
+
+	setCwd(paneId: string, cwd: string): void {
+		const wcId = this.paneWebContentsIds.get(paneId);
+		if (wcId != null) {
+			this.webContentsCwds.set(wcId, cwd);
+		} else {
+			this.pendingCwds.set(paneId, cwd);
+		}
 	}
 
 	navigate(paneId: string, url: string): void {

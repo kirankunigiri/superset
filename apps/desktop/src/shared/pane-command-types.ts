@@ -17,7 +17,9 @@ export interface PaneCommand {
 		| "focusPane"
 		| "readTerminal"
 		| "writeTerminal"
-		| "getCurrentWorkspace";
+		| "getCurrentWorkspace"
+		| "getWorkspaceForCwd";
+	cwd?: string;
 	workspaceId?: string;
 	paneId?: string;
 	tabId?: string;

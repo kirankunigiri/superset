@@ -7,7 +7,6 @@ import { useV2UserPreferences } from "renderer/hooks/useV2UserPreferences";
 import { useHotkey } from "renderer/hotkeys";
 import {
 	registerV2PaneStore,
-	unregisterV2PaneStore,
 } from "renderer/lib/v2-pane-store-registry";
 import { CommandPalette } from "renderer/screens/main/components/CommandPalette";
 import { ResizablePanel } from "renderer/screens/main/components/ResizablePanel";
@@ -125,7 +124,6 @@ function V2WorkspaceContent() {
 	const { store } = useV2WorkspacePaneLayout();
 	useEffect(() => {
 		registerV2PaneStore(workspaceId, store, hostUrl);
-		return () => unregisterV2PaneStore(workspaceId);
 	}, [workspaceId, store, hostUrl]);
 	useClearActivePaneAttention({ store });
 	const launcher = useV2TerminalLauncher();

@@ -2,5 +2,27 @@
 	"attribution": {
 		"commit": "",
 		"pr": ""
+	},
+	"hooks": {
+		"PreToolUse": [
+			{
+				"matcher": "mcp__superset-browser__new_page",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"new_page is not supported. Use superset-panes MCP create_browser_pane tool instead.\"}}'"
+					}
+				]
+			},
+			{
+				"matcher": "mcp__superset-browser__close_page",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"close_page is not supported. Use superset-panes MCP close_pane tool instead.\"}}'"
+					}
+				]
+			}
+		]
 	}
 }

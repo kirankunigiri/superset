@@ -11,11 +11,13 @@ import { DEFAULT_BROWSER_URL } from "../../constants";
 interface UsePersistentWebviewOptions {
 	paneId: string;
 	ctx: RendererContext<PaneViewerData>;
+	workspaceCwd?: string;
 }
 
 export function usePersistentWebview({
 	paneId,
 	ctx,
+	workspaceCwd,
 }: UsePersistentWebviewOptions) {
 	const placeholderRef = useRef<HTMLDivElement | null>(null);
 	const ctxRef = useRef(ctx);
@@ -24,6 +26,7 @@ export function usePersistentWebview({
 	const paneData = ctx.pane.data as BrowserPaneData;
 	const initialUrlRef = useRef(paneData.url || DEFAULT_BROWSER_URL);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: workspaceCwd is handled by a separate setCwd effect; re-attaching on cwd change causes webview reset
 	useEffect(() => {
 		const placeholder = placeholderRef.current;
 		if (!placeholder) return;
@@ -47,12 +50,21 @@ export function usePersistentWebview({
 					faviconUrl,
 				});
 			},
+			workspaceCwd,
 		);
 
 		return () => {
 			browserRuntimeRegistry.detach(paneId);
 		};
 	}, [paneId]);
+
+	useEffect(() => {
+		if (workspaceCwd) {
+			electronTrpcClient.browser.setCwd
+				.mutate({ paneId, workspaceCwd })
+				.catch(() => {});
+		}
+	}, [paneId, workspaceCwd]);
 
 	useEffect(() => {
 		const newWindowSub = electronTrpcClient.browser.onNewWindow.subscribe(

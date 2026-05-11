@@ -417,6 +417,13 @@ if (!gotTheLock) {
 
 		await makeAppSetup(() => MainWindow());
 		setupAutoUpdater();
+
+		const cdpPort = process.env.DESKTOP_AUTOMATION_PORT;
+		if (cdpPort) {
+			const { startCDPProxy } = await import("main/lib/cdp-proxy");
+			const proxyPort = await startCDPProxy(Number(cdpPort));
+			process.env.DESKTOP_CDP_PROXY_PORT = String(proxyPort);
+		}
 		initTray();
 
 		const coldStartUrl = findDeepLinkInArgv(process.argv);
