@@ -9,8 +9,10 @@ import {
 } from "renderer/screens/main/components/WorkspaceView/utils/code-theme";
 import { useResolvedTheme, useTerminalTheme } from "renderer/stores/theme";
 import type { DiffFileSource } from "../../../../../useChangeset";
+import { useReviewCommentSelection } from "../../hooks/useReviewCommentSelection";
 import { CommentThread } from "../CommentThread";
 import { DiffFileHeader } from "../DiffFileHeader";
+import { ReviewComposer } from "../ReviewComposer";
 import {
 	type DiffCommentThread,
 	useDiffAnnotations,
@@ -111,6 +113,9 @@ export const WorkspaceDiff = memo(function WorkspaceDiff({
 	});
 
 	const lineAnnotations = useDiffAnnotations({ workspaceId, path });
+	const reviewComment = useReviewCommentSelection({
+		fileContents: diffQuery.data?.newFile.contents,
+	});
 	const renderAnnotation = useCallback(
 		(annotation: { lineNumber: number; metadata: DiffCommentThread }) => (
 			<CommentThread
@@ -131,7 +136,7 @@ export const WorkspaceDiff = memo(function WorkspaceDiff({
 	);
 
 	return (
-		<div className="flex flex-col">
+		<div className="relative flex flex-col">
 			<DiffFileHeader
 				path={path}
 				status={status}
@@ -153,6 +158,7 @@ export const WorkspaceDiff = memo(function WorkspaceDiff({
 					newFile={diffQuery.data.newFile}
 					style={themeVars}
 					lineAnnotations={lineAnnotations}
+					selectedLines={reviewComment.selectedLines}
 					renderAnnotation={renderAnnotation}
 					options={{
 						diffStyle,
@@ -162,19 +168,14 @@ export const WorkspaceDiff = memo(function WorkspaceDiff({
 						disableFileHeader: true,
 						theme: shikiTheme,
 						themeType: activeTheme.type,
+						enableLineSelection: true,
+						onLineSelectionEnd: reviewComment.onLineSelectionEnd,
 						unsafeCSS: `
 							* { user-select: text; -webkit-user-select: text; }
-							/* Pierre sets --diffs-light-bg/--diffs-dark-bg
-							 * inline on <pre data-diff> from the Shiki theme;
-							 * inline beats :host so we override at the pre. */
 							[data-diff] {
 								--diffs-light-bg: ${surfaceBg} !important;
 								--diffs-dark-bg: ${surfaceBg} !important;
 							}
-							/* Flatten the "N unmodified lines" strip flush to
-							 * the pane edges (kills wrapper/content/expand-
-							 * button rounding + inline gap on both
-							 * line-info and line-info-basic). */
 							[data-separator^='line-info'] [data-separator-wrapper],
 							[data-separator^='line-info'] [data-separator-content],
 							[data-separator^='line-info'] [data-expand-up],
@@ -188,6 +189,16 @@ export const WorkspaceDiff = memo(function WorkspaceDiff({
 					}}
 				/>
 			) : null}
+			{reviewComment.selection && (
+				<div className="sticky bottom-2 z-50 flex justify-start px-2">
+					<ReviewComposer
+						workspaceId={workspaceId}
+						filePath={path}
+						selection={reviewComment.selection}
+						onClose={reviewComment.clearSelection}
+					/>
+				</div>
+			)}
 		</div>
 	);
 });
