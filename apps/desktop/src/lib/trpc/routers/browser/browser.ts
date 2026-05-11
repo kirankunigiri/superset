@@ -150,6 +150,29 @@ export const createBrowserRouter = () => {
 				};
 			}),
 
+		getDevToolsUrl: publicProcedure
+			.input(z.object({ paneId: z.string() }))
+			.query(async ({ input }) => {
+				const wc = browserManager.getWebContents(input.paneId);
+				if (!wc) return { url: null };
+				const targetUrl = wc.getURL();
+				const cdpPort = process.env.DESKTOP_AUTOMATION_PORT || "9333";
+				try {
+					const resp = await fetch(`http://127.0.0.1:${cdpPort}/json`);
+					const targets: Array<{
+						url: string;
+						id?: string;
+					}> = await resp.json();
+					const target = targets.find((t) => t.url === targetUrl);
+					if (!target?.id) return { url: null };
+					return {
+						url: `devtools://devtools/bundled/inspector.html?ws=127.0.0.1:${cdpPort}/devtools/page/${target.id}`,
+					};
+				} catch {
+					return { url: null };
+				}
+			}),
+
 		clearBrowsingData: publicProcedure
 			.input(
 				z.object({

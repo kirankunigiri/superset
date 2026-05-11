@@ -47,6 +47,7 @@ import { ChatPaneTitle } from "./components/ChatPane/components/ChatPaneTitle";
 import { CommentPane } from "./components/CommentPane";
 import { CommentPaneHeaderExtras } from "./components/CommentPane/components/CommentPaneHeaderExtras";
 import { CommentPaneTitle } from "./components/CommentPane/components/CommentPaneTitle";
+import { DevtoolsPane } from "./components/DevtoolsPane/DevtoolsPane";
 import { DiffPane } from "./components/DiffPane";
 import { DiffPaneHeaderExtras } from "./components/DiffPane/components/DiffPaneHeaderExtras";
 import { FilePane } from "./components/FilePane";
@@ -482,15 +483,13 @@ export function usePaneRegistry({
 					),
 			},
 			devtools: {
-				getTitle: () => "DevTools",
-				renderPane: (ctx: RendererContext<PaneViewerData>) => {
-					const data = ctx.pane.data as DevtoolsPaneData;
-					return (
-						<div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-							Inspecting {data.targetTitle}
-						</div>
-					);
+				getTitle: (ctx) => {
+					const data = ctx.data as DevtoolsPaneData;
+					return `DevTools — ${data.targetTitle}`;
 				},
+				renderPane: (ctx: RendererContext<PaneViewerData>) => (
+					<DevtoolsPane ctx={ctx} />
+				),
 			},
 		}),
 		[

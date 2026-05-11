@@ -3,7 +3,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { GlobeIcon } from "lucide-react";
 import { useCallback, useSyncExternalStore } from "react";
 import { TbDeviceDesktop } from "react-icons/tb";
-import { electronTrpcClient } from "renderer/lib/trpc-client";
 import type { BrowserPaneData, PaneViewerData } from "../../../../types";
 
 import { browserRuntimeRegistry } from "./browserRuntimeRegistry";
@@ -85,8 +84,22 @@ export function BrowserPaneToolbar({ ctx }: BrowserPaneToolbarProps) {
 	const state = useBrowserState(paneId);
 
 	const handleOpenDevTools = useCallback(() => {
-		electronTrpcClient.browser.openDevTools.mutate({ paneId }).catch(() => {});
-	}, [paneId]);
+		const store = ctx.store.getState();
+		const tab = store.tabs.find((t) => Object.keys(t.panes).includes(paneId));
+		if (!tab) return;
+		store.splitPane({
+			tabId: tab.id,
+			paneId,
+			position: "right",
+			newPane: {
+				kind: "devtools",
+				data: {
+					targetPaneId: paneId,
+					targetTitle: state.pageTitle || state.currentUrl || "Browser",
+				},
+			},
+		});
+	}, [paneId, ctx.store, state.pageTitle, state.currentUrl]);
 
 	const handleGoBack = useCallback(() => {
 		browserRuntimeRegistry.goBack(paneId);
