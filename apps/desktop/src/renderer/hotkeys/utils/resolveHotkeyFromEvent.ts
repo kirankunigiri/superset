@@ -155,3 +155,29 @@ function rebuild() {
 useHotkeyOverridesStore.subscribe(rebuild);
 useKeyboardLayoutStore.subscribe(rebuild);
 useKeyboardPreferencesStore.subscribe(rebuild);
+
+function syncWebviewOverrideChords() {
+	const { webviewOverrides, overrides } = useHotkeyOverridesStore.getState();
+	const layoutMap = getEffectiveLayoutMap();
+	const chords: string[] = [];
+	for (const [id, enabled] of Object.entries(webviewOverrides)) {
+		if (!enabled) continue;
+		const hotkeyId = id as HotkeyId;
+		const hasOverride = hotkeyId in overrides;
+		const override = hasOverride ? overrides[hotkeyId] : undefined;
+		if (hasOverride && override === null) continue;
+		const binding = override ?? HOTKEYS[hotkeyId]?.key;
+		if (!binding) continue;
+		const dispatchChord = bindingToDispatchChord(binding, layoutMap);
+		if (dispatchChord) chords.push(canonicalizeChord(dispatchChord));
+	}
+	import("renderer/lib/trpc-client").then(({ electronTrpcClient }) => {
+		electronTrpcClient.browser.setOverrideChords
+			.mutate({ chords })
+			.catch(() => {});
+	});
+}
+syncWebviewOverrideChords();
+useHotkeyOverridesStore.subscribe(syncWebviewOverrideChords);
+useKeyboardLayoutStore.subscribe(syncWebviewOverrideChords);
+useKeyboardPreferencesStore.subscribe(syncWebviewOverrideChords);

@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { clipboard, Menu, webContents } from "electron";
+import { BrowserWindow, clipboard, Menu, webContents } from "electron";
 import { safeOpenExternal } from "main/lib/safe-url";
 
 interface ConsoleEntry {
@@ -23,16 +23,46 @@ function sanitizeUrl(url: string): string {
 	return `https://www.google.com/search?q=${encodeURIComponent(url)}`;
 }
 
+function inputToChord(input: Electron.Input): string | null {
+	if (input.type !== "keyDown") return null;
+	const key = input.code?.toLowerCase().replace(/key|digit|numpad/, "") ?? "";
+	if (
+		!key ||
+		key === "controlleft" ||
+		key === "controlright" ||
+		key === "metaleft" ||
+		key === "metaright" ||
+		key === "shiftleft" ||
+		key === "shiftright" ||
+		key === "altleft" ||
+		key === "altright"
+	)
+		return null;
+	const mods: string[] = [];
+	if (input.meta) mods.push("meta");
+	if (input.control) mods.push("ctrl");
+	if (input.alt) mods.push("alt");
+	if (input.shift) mods.push("shift");
+	mods.sort();
+	return [...mods, key].join("+");
+}
+
 class BrowserManager extends EventEmitter {
 	private paneWebContentsIds = new Map<string, number>();
 	private webContentsCwds = new Map<number, string>();
 	private pendingCwds = new Map<string, string>();
+	private overrideChords = new Set<string>();
+	private beforeInputListeners = new Map<string, () => void>();
 	private consoleLogs = new Map<string, ConsoleEntry[]>();
 	private consoleListeners = new Map<string, () => void>();
 	private contextMenuListeners = new Map<string, () => void>();
 
 	registerPendingCwd(paneId: string, cwd: string): void {
 		this.pendingCwds.set(paneId, cwd);
+	}
+
+	setOverrideChords(chords: string[]): void {
+		this.overrideChords = new Set(chords);
 	}
 
 	register(paneId: string, webContentsId: number, workspaceCwd?: string): void {
@@ -55,9 +85,39 @@ class BrowserManager extends EventEmitter {
 		}
 		const wc = webContents.fromId(webContentsId);
 		if (wc) {
-			// Keep throttling enabled so parked/offscreen persistent webviews don't
-			// run at full speed in the background.
 			wc.setBackgroundThrottling(true);
+			const prevBeforeInput = this.beforeInputListeners.get(paneId);
+			if (prevBeforeInput) prevBeforeInput();
+			const beforeInputHandler = (
+				event: Electron.Event,
+				input: Electron.Input,
+			) => {
+				const chord = inputToChord(input);
+				if (chord && this.overrideChords.has(chord)) {
+					event.preventDefault();
+					const win = BrowserWindow.getAllWindows().find(
+						(w) => !w.isDestroyed(),
+					);
+					if (win) {
+						win.webContents.sendInputEvent({
+							type: input.type as "keyDown" | "keyUp",
+							keyCode: input.key,
+							modifiers: [
+								...(input.meta ? ["meta" as const] : []),
+								...(input.control ? ["ctrl" as const] : []),
+								...(input.alt ? ["alt" as const] : []),
+								...(input.shift ? ["shift" as const] : []),
+							],
+						});
+					}
+				}
+			};
+			wc.on("before-input-event", beforeInputHandler);
+			this.beforeInputListeners.set(paneId, () => {
+				try {
+					wc.off("before-input-event", beforeInputHandler);
+				} catch {}
+			});
 			wc.setWindowOpenHandler(({ url }) => {
 				if (url && url !== "about:blank") {
 					this.emit(`new-window:${paneId}`, url);
@@ -70,7 +130,11 @@ class BrowserManager extends EventEmitter {
 	}
 
 	unregister(paneId: string): void {
-		for (const map of [this.consoleListeners, this.contextMenuListeners]) {
+		for (const map of [
+			this.consoleListeners,
+			this.contextMenuListeners,
+			this.beforeInputListeners,
+		]) {
 			const cleanup = map.get(paneId);
 			if (cleanup) {
 				cleanup();

@@ -21,7 +21,7 @@ export function V2VscodeInlineButton({
 	workspaceId,
 }: V2VscodeInlineButtonProps) {
 	const collections = useCollections();
-	const { machineId, activeHostUrl } = useLocalHostService();
+	const { activeHostUrl } = useLocalHostService();
 
 	const { data: workspaces = [] } = useLiveQuery(
 		(q) =>

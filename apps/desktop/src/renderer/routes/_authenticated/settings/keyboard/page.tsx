@@ -12,6 +12,7 @@ import { Kbd, KbdGroup } from "@superset/ui/kbd";
 import { Label } from "@superset/ui/label";
 import { toast } from "@superset/ui/sonner";
 import { Switch } from "@superset/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@superset/ui/tooltip";
 import { cn } from "@superset/ui/utils";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
@@ -53,6 +54,12 @@ function HotkeyRow({
 	onReset: () => void;
 }) {
 	const { keys } = useHotkeyDisplay(id);
+	const webviewOverride = useHotkeyOverridesStore(
+		(s) => s.webviewOverrides[id] ?? false,
+	);
+	const setWebviewOverride = useHotkeyOverridesStore(
+		(s) => s.setWebviewOverride,
+	);
 
 	return (
 		<div
@@ -61,13 +68,46 @@ function HotkeyRow({
 				isRecording && "bg-destructive/5",
 			)}
 		>
-			<div className="flex flex-col">
+			<div className="flex flex-col min-w-0 flex-1">
 				<span className="text-sm text-foreground">{label}</span>
 				{description && (
 					<span className="text-xs text-muted-foreground">{description}</span>
 				)}
 			</div>
-			<div className="flex items-center gap-2">
+			<div className="flex items-center gap-3">
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<button
+							type="button"
+							onClick={() => setWebviewOverride(id, !webviewOverride)}
+							className={cn(
+								"flex items-center justify-center size-5 rounded border transition-colors",
+								webviewOverride
+									? "border-primary bg-primary text-primary-foreground"
+									: "border-muted-foreground/30 hover:border-muted-foreground/50",
+							)}
+							aria-label="Override in browser panes"
+						>
+							{webviewOverride && (
+								<svg
+									viewBox="0 0 12 12"
+									className="size-3"
+									fill="none"
+									stroke="currentColor"
+									strokeWidth={2}
+									aria-hidden="true"
+								>
+									<path d="M2 6l3 3 5-5" />
+								</svg>
+							)}
+						</button>
+					</TooltipTrigger>
+					<TooltipContent side="top" sideOffset={4}>
+						{webviewOverride
+							? "This shortcut overrides browser pane input"
+							: "Check to use this shortcut even when a browser pane is focused"}
+					</TooltipContent>
+				</Tooltip>
 				<button
 					type="button"
 					onClick={onStartRecording}

@@ -6,6 +6,13 @@ import { publicProcedure, router } from "../..";
 
 export const createBrowserRouter = () => {
 	return router({
+		setOverrideChords: publicProcedure
+			.input(z.object({ chords: z.array(z.string()) }))
+			.mutation(({ input }) => {
+				browserManager.setOverrideChords(input.chords);
+				return { success: true };
+			}),
+
 		register: publicProcedure
 			.input(
 				z.object({

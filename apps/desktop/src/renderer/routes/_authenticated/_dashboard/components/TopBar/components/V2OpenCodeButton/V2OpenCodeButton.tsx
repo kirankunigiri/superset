@@ -19,7 +19,7 @@ interface V2OpenCodeButtonProps {
 
 export function V2OpenCodeButton({ workspaceId }: V2OpenCodeButtonProps) {
 	const collections = useCollections();
-	const { machineId, activeHostUrl } = useLocalHostService();
+	const { activeHostUrl } = useLocalHostService();
 
 	const { data: workspaces = [] } = useLiveQuery(
 		(q) =>

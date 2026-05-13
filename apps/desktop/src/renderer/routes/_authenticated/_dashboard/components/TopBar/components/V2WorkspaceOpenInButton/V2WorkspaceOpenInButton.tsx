@@ -14,7 +14,7 @@ export function V2WorkspaceOpenInButton({
 	workspaceId,
 }: V2WorkspaceOpenInButtonProps) {
 	const collections = useCollections();
-	const { machineId, activeHostUrl } = useLocalHostService();
+	const { activeHostUrl } = useLocalHostService();
 
 	const { data: workspaces = [] } = useLiveQuery(
 		(q) =>
