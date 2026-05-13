@@ -9,15 +9,11 @@ interface V2WorkspaceEntry {
 	hostUrl: string;
 }
 
-const registry: Map<string, V2WorkspaceEntry> =
-	(globalThis as Record<string, unknown>).__v2PaneStoreRegistry as Map<
-		string,
-		V2WorkspaceEntry
-	> ??
-	((globalThis as Record<string, unknown>).__v2PaneStoreRegistry = new Map<
-		string,
-		V2WorkspaceEntry
-	>());
+const g = globalThis as Record<string, unknown>;
+if (!g.__v2PaneStoreRegistry) {
+	g.__v2PaneStoreRegistry = new Map<string, V2WorkspaceEntry>();
+}
+const registry = g.__v2PaneStoreRegistry as Map<string, V2WorkspaceEntry>;
 
 export function registerV2PaneStore(
 	workspaceId: string,

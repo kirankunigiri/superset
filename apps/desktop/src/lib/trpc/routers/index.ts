@@ -18,6 +18,7 @@ import { createKeyboardLayoutRouter } from "./keyboardLayout";
 import { createMenuRouter } from "./menu";
 import { createMigrationRouter } from "./migration";
 import { createNotificationsRouter } from "./notifications";
+import { createOpenCodeRouter } from "./opencode";
 import { createPermissionsRouter } from "./permissions";
 import { createPortsRouter } from "./ports";
 import { createProjectsRouter } from "./projects";
@@ -63,6 +64,7 @@ export const createAppRouter = (getWindow: () => BrowserWindow | null) => {
 		keyboardLayout: createKeyboardLayoutRouter(),
 		migration: createMigrationRouter(),
 		vscodeInline: createVscodeInlineRouter(),
+		openCode: createOpenCodeRouter(),
 	});
 };
 

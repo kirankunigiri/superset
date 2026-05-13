@@ -6,20 +6,18 @@ import { useLiveQuery } from "@tanstack/react-db";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useCallback } from "react";
-import vscodeIcon from "renderer/assets/app-icons/vscode.svg";
+import openCodeIcon from "renderer/assets/app-icons/opencode.png";
 import { electronTrpc } from "renderer/lib/electron-trpc";
 import { getHostServiceClientByUrl } from "renderer/lib/host-service-client";
 import { getV2PaneStore } from "renderer/lib/v2-pane-store-registry";
 import { useCollections } from "../../../../../providers/CollectionsProvider";
 import { useLocalHostService } from "../../../../../providers/LocalHostServiceProvider";
 
-interface V2VscodeInlineButtonProps {
+interface V2OpenCodeButtonProps {
 	workspaceId: string;
 }
 
-export function V2VscodeInlineButton({
-	workspaceId,
-}: V2VscodeInlineButtonProps) {
+export function V2OpenCodeButton({ workspaceId }: V2OpenCodeButtonProps) {
 	const collections = useCollections();
 	const { machineId, activeHostUrl } = useLocalHostService();
 
@@ -37,7 +35,7 @@ export function V2VscodeInlineButton({
 	const workspace = workspaces[0] ?? null;
 
 	const workspaceQuery = useQuery({
-		queryKey: ["v2-vscode-inline-workspace", activeHostUrl, workspaceId],
+		queryKey: ["v2-opencode-workspace", activeHostUrl, workspaceId],
 		queryFn: () =>
 			getHostServiceClientByUrl(activeHostUrl as string).workspace.get.query({
 				id: workspaceId,
@@ -45,9 +43,9 @@ export function V2VscodeInlineButton({
 		enabled: !!workspace && !!activeHostUrl,
 	});
 
-	const mutation = electronTrpc.vscodeInline.getUrl.useMutation({
+	const mutation = electronTrpc.openCode.getUrl.useMutation({
 		onError: (error) =>
-			toast.error("Failed to open VS Code inline", {
+			toast.error("Failed to open OpenCode", {
 				description: error.message,
 			}),
 	});
@@ -56,7 +54,6 @@ export function V2VscodeInlineButton({
 		const worktreePath = workspaceQuery.data?.worktreePath;
 		if (!worktreePath || mutation.isPending) return;
 		const result = await mutation.mutateAsync({
-			variant: "vscode",
 			folderPath: worktreePath,
 		});
 		const store = getV2PaneStore(workspaceId);
@@ -80,7 +77,7 @@ export function V2VscodeInlineButton({
 					type="button"
 					onClick={handleClick}
 					disabled={isLoading}
-					aria-label="Open VS Code inline"
+					aria-label="Open OpenCode"
 					className={cn(
 						"no-drag flex items-center justify-center h-6 w-6 rounded",
 						"text-muted-foreground",
@@ -94,12 +91,16 @@ export function V2VscodeInlineButton({
 					{isLoading ? (
 						<Loader2 className="size-3.5 animate-spin" />
 					) : (
-						<img src={vscodeIcon} alt="" className="size-3.5 object-contain" />
+						<img
+							src={openCodeIcon}
+							alt=""
+							className="size-3.5 object-contain"
+						/>
 					)}
 				</button>
 			</TooltipTrigger>
 			<TooltipContent side="bottom" sideOffset={6}>
-				{isLoading ? "Starting VS Code server..." : "Open VS Code (inline)"}
+				{isLoading ? "Starting OpenCode..." : "Open OpenCode"}
 			</TooltipContent>
 		</Tooltip>
 	);

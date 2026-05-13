@@ -30,7 +30,6 @@ export function V2WorkspaceOpenInButton({
 		[collections, workspaceId],
 	);
 	const workspace = workspaces[0] ?? null;
-	const isLocalWorkspace = Boolean(workspace) && workspace.hostId === machineId;
 
 	const workspaceQuery = useQuery({
 		queryKey: ["v2-open-in-workspace", activeHostUrl, workspaceId],
@@ -38,10 +37,10 @@ export function V2WorkspaceOpenInButton({
 			getHostServiceClientByUrl(activeHostUrl as string).workspace.get.query({
 				id: workspaceId,
 			}),
-		enabled: !!workspace && !!activeHostUrl && isLocalWorkspace,
+		enabled: !!workspace && !!activeHostUrl,
 	});
 
-	if (!workspace || !activeHostUrl || !isLocalWorkspace) {
+	if (!workspace || !activeHostUrl) {
 		return null;
 	}
 

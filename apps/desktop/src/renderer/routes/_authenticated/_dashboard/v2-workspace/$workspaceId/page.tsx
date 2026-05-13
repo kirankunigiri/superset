@@ -5,9 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useV2UserPreferences } from "renderer/hooks/useV2UserPreferences";
 import { useHotkey } from "renderer/hotkeys";
-import {
-	registerV2PaneStore,
-} from "renderer/lib/v2-pane-store-registry";
+import { registerV2PaneStore } from "renderer/lib/v2-pane-store-registry";
 import { CommandPalette } from "renderer/screens/main/components/CommandPalette";
 import { ResizablePanel } from "renderer/screens/main/components/ResizablePanel";
 import { getV2NotificationSourcesForTab } from "renderer/stores/v2-notifications";

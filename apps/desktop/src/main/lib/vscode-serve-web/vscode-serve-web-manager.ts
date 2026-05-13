@@ -129,6 +129,9 @@ class VscodeServeWebManager {
 			return existing.baseUrl;
 		}
 
+		const adopted = await this.#tryAdoptExisting();
+		if (adopted) return adopted;
+
 		const pending = this.#launching.get(variant);
 		if (pending) return pending;
 
@@ -139,6 +142,23 @@ class VscodeServeWebManager {
 		} finally {
 			this.#launching.delete(variant);
 		}
+	}
+
+	async #tryAdoptExisting(): Promise<string | null> {
+		try {
+			const resp = await fetch(`http://127.0.0.1:${SERVE_WEB_PORT}/`, {
+				signal: AbortSignal.timeout(2000),
+			});
+			if (resp.ok || resp.status === 302) {
+				const baseUrl = `http://127.0.0.1:${SERVE_WEB_PORT}`;
+				console.log(
+					"[vscode-serve-web] Adopted existing server on port",
+					SERVE_WEB_PORT,
+				);
+				return baseUrl;
+			}
+		} catch {}
+		return null;
 	}
 
 	buildFolderUrl(baseUrl: string, folderPath: string): string {
